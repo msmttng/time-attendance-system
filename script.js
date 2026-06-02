@@ -4,7 +4,7 @@
 
 // --- 設定 ---
 // TODO: GASをデプロイしたあとに発行されるWebアプリのURLをここに設定する
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID_HERE/exec';
+const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxC6QMDA8rozGLPQylqpW8Kx_njtdWIjyaAJIwe61f01Nahc3b1DQKEVGFkjmqjN2S_/exec';
 
 // --- 時計機能 ---
 function updateClock() {
