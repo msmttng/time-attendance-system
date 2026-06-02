@@ -1,23 +1,42 @@
 /**
- * スマート打刻システム - GAS バックエンド (専用管理画面・打刻履歴修正対応版)
+ * スマート打刻システム - GAS バックエンド (従業員個別詳細勤務表・契約個人設定・承認管理対応版)
  */
 
 const LOG_SHEET_NAME = '打刻履歴';
 const EMP_SHEET_NAME = '従業員';
+const DAILY_SHEET_NAME = '日別勤務データ';
 const SETTING_SHEET_NAME = '設定';
 
 function setupSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. 打刻履歴シートの初期化
   if (!ss.getSheetByName(LOG_SHEET_NAME)) {
     const sheet = ss.insertSheet(LOG_SHEET_NAME);
     sheet.appendRow(['サーバー時刻', 'ユーザーID', '氏名', '打刻種類', 'クライアント時刻']);
   }
-  if (!ss.getSheetByName(EMP_SHEET_NAME)) {
-    const sheet = ss.insertSheet(EMP_SHEET_NAME);
-    sheet.appendRow(['ユーザーID', '氏名', '休憩時間(分)']);
-    sheet.appendRow(['user001', '山田 太郎', 120]);
-    sheet.appendRow(['user002', '佐藤 花子', 60]);
+  
+  // 2. 従業員シートの初期化およびカラム拡張
+  let empSheet = ss.getSheetByName(EMP_SHEET_NAME);
+  const empHeaders = ['ユーザーID', '氏名', '休憩時間(分)', 'メールアドレス', '基本出勤時間', '基本退勤時間', '所定労働時間', '給与', '勤務タイプ', 'アバターURL'];
+  if (!empSheet) {
+    empSheet = ss.insertSheet(EMP_SHEET_NAME);
+    empSheet.appendRow(empHeaders);
+    empSheet.appendRow(['user001', '月村 佳世', 120, 'masamitting@gmail.com', '13:00', '19:00', 120, 200000, '勤務タイプ①', '']);
+    empSheet.appendRow(['user002', '佐藤 花子', 60, 'sato@gmail.com', '09:00', '18:00', 160, 250000, '勤務タイプ①', '']);
+  } else {
+    // 既存シートのヘッダーを上書き拡張（データは保持）
+    const range = empSheet.getRange(1, 1, 1, empHeaders.length);
+    range.setValues([empHeaders]);
   }
+  
+  // 3. 日別勤務データシートの新設
+  if (!ss.getSheetByName(DAILY_SHEET_NAME)) {
+    const sheet = ss.insertSheet(DAILY_SHEET_NAME);
+    sheet.appendRow(['日付', 'ユーザーID', '区分', '承認ステータス', '日報内容']);
+  }
+  
+  // 4. 設定シートの初期化
   if (!ss.getSheetByName(SETTING_SHEET_NAME)) {
     const sheet = ss.insertSheet(SETTING_SHEET_NAME);
     sheet.appendRow(['設定項目', '値']);
@@ -46,9 +65,19 @@ function getEmployees() {
   let employees = {};
   for (let i = 1; i < data.length; i++) {
     const id = data[i][0];
-    const name = data[i][1];
-    const breakMins = parseInt(data[i][2], 10) || 0;
-    if (id) employees[String(id)] = { name: name, breakMinutes: breakMins };
+    if (id) {
+      employees[String(id)] = {
+        name: data[i][1] || '',
+        breakMinutes: parseInt(data[i][2], 10) || 0,
+        email: data[i][3] || '',
+        startTime: data[i][4] || '',
+        endTime: data[i][5] || '',
+        standardHours: parseInt(data[i][6], 10) || 0,
+        salary: parseInt(data[i][7], 10) || 0,
+        workType: data[i][8] || '',
+        avatarUrl: data[i][9] || ''
+      };
+    }
   }
   return employees;
 }
@@ -59,7 +88,8 @@ function doPost(e) {
     const action = payload.action || 'clock_in_out';
     const settings = getSettings();
 
-    if (['save_settings', 'save_user', 'delete_user', 'update_log', 'delete_log', 'add_log'].includes(action)) {
+    // 管理者認証が必要なアクション
+    if (['save_settings', 'save_user', 'delete_user', 'update_log', 'delete_log', 'add_log', 'update_daily_status'].includes(action)) {
       if (payload.adminPassword !== settings.password) throw new Error('認証エラー');
     }
 
@@ -73,20 +103,49 @@ function doPost(e) {
       return createSuccessResponse('設定を保存しました。');
     }
     
+    // 従業員の保存・更新 (下位互換性を保ちながら拡張パラメータに対応)
     if (action === 'save_user') {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EMP_SHEET_NAME);
+      setupSheets(); // 拡張列が未作成の場合はここで自動作成
       const data = sheet.getDataRange().getValues();
       let found = false;
+      const user = payload.user; // id, name, breakMinutes, email, startTime, endTime, standardHours, salary, workType, avatarUrl
+      
+      const newRow = [
+        user.id,
+        user.name,
+        parseInt(user.breakMinutes, 10) || 0,
+        user.email || '',
+        user.startTime || '',
+        user.endTime || '',
+        parseInt(user.standardHours, 10) || 0,
+        parseInt(user.salary, 10) || 0,
+        user.workType || '',
+        user.avatarUrl || ''
+      ];
+
       for (let i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === String(payload.user.id)) {
-          sheet.getRange(i+1, 2).setValue(payload.user.name);
-          sheet.getRange(i+1, 3).setValue(payload.user.breakMinutes);
+        if (String(data[i][0]) === String(user.id)) {
+          const oldRow = data[i];
+          const mergedRow = [
+            user.id,
+            user.name !== undefined ? user.name : oldRow[1],
+            user.breakMinutes !== undefined ? parseInt(user.breakMinutes, 10) : oldRow[2],
+            user.email !== undefined ? user.email : (oldRow[3] || ''),
+            user.startTime !== undefined ? user.startTime : (oldRow[4] || ''),
+            user.endTime !== undefined ? user.endTime : (oldRow[5] || ''),
+            user.standardHours !== undefined ? parseInt(user.standardHours, 10) : (oldRow[6] || 0),
+            user.salary !== undefined ? parseInt(user.salary, 10) : (oldRow[7] || 0),
+            user.workType !== undefined ? user.workType : (oldRow[8] || ''),
+            user.avatarUrl !== undefined ? user.avatarUrl : (oldRow[9] || '')
+          ];
+          sheet.getRange(i+1, 1, 1, mergedRow.length).setValues([mergedRow]);
           found = true;
           break;
         }
       }
-      if (!found) sheet.appendRow([payload.user.id, payload.user.name, payload.user.breakMinutes]);
-      return createSuccessResponse('従業員を保存しました。');
+      if (!found) sheet.appendRow(newRow);
+      return createSuccessResponse('従業員情報を保存しました。');
     }
     
     if (action === 'delete_user') {
@@ -130,12 +189,35 @@ function doPost(e) {
       const serverTime = new Date(payload.serverTime);
       sheet.appendRow([serverTime, payload.userId, payload.userName, payload.type, payload.clientTime || '手動追加']);
       
-      // 追加後に日付順で並び替える（オプション）
       const lastRow = sheet.getLastRow();
       if (lastRow > 2) {
         sheet.getRange(2, 1, lastRow - 1, 5).sort({column: 1, ascending: true});
       }
       return createSuccessResponse('打刻データを追加しました。');
+    }
+
+    // --- 日別勤務データの保存（有給/欠勤などの区分、承認/差戻し状態、日報メモ） ---
+    if (action === 'update_daily_status') {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DAILY_SHEET_NAME);
+      if (!sheet) throw new Error('日別勤務データシートが見つかりません');
+      const data = sheet.getDataRange().getValues();
+      const { date, userId, type, status, report } = payload; // date: YYYY-MM-DD
+      let found = false;
+      
+      for (let i = 1; i < data.length; i++) {
+        const rowDateStr = data[i][0] instanceof Date ? Utilities.formatDate(data[i][0], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(data[i][0]);
+        if (rowDateStr === date && String(data[i][1]) === String(userId)) {
+          if (type !== undefined) sheet.getRange(i+1, 3).setValue(type);
+          if (status !== undefined) sheet.getRange(i+1, 4).setValue(status);
+          if (report !== undefined) sheet.getRange(i+1, 5).setValue(report);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        sheet.appendRow([new Date(date), userId, type || '', status || '', report || '']);
+      }
+      return createSuccessResponse('日別勤務データを更新しました。');
     }
 
     // --- 通常の打刻 ---
@@ -171,37 +253,62 @@ function doGet(e) {
     if (action === 'get_data') {
       const settings = getSettings();
       if (e.parameter.password !== settings.password) throw new Error('パスワードが間違っています。');
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-      if (!sheet) { setupSheets(); return createSuccessResponse(null, []); }
       
-      const data = sheet.getDataRange().getValues();
-      if (data.length <= 1) return createSuccessResponse(null, []);
+      const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      const dailySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DAILY_SHEET_NAME);
       
       const targetMonth = e.parameter.month;
       
-      let resultData = [];
-      for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        const serverTimeStr = row[0] instanceof Date ? row[0].toISOString() : row[0];
-        
-        if (targetMonth) {
-          const dateObj = new Date(serverTimeStr);
-          const yyyy = dateObj.getFullYear();
-          const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-          if (`${yyyy}-${mm}` !== targetMonth) continue;
+      // 1. 打刻履歴の取得
+      let logs = [];
+      if (logSheet) {
+        const data = logSheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          const serverTimeStr = row[0] instanceof Date ? row[0].toISOString() : row[0];
+          
+          if (targetMonth) {
+            const dateObj = new Date(serverTimeStr);
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            if (`${yyyy}-${mm}` !== targetMonth) continue;
+          }
+          
+          logs.push({
+            rowNumber: i + 1,
+            serverTime: serverTimeStr,
+            userId: row[1],
+            userName: row[2],
+            type: row[3],
+            clientTime: row[4]
+          });
         }
-        
-        resultData.push({
-          rowNumber: i + 1, // スプレッドシートの行番号(1-indexed)
-          serverTime: serverTimeStr,
-          userId: row[1],
-          userName: row[2],
-          type: row[3],
-          clientTime: row[4]
-        });
       }
       
-      return createSuccessResponse(null, resultData);
+      // 2. 日別勤務データの取得
+      let dailyData = [];
+      if (dailySheet) {
+        const data = dailySheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          const dateObj = row[0] instanceof Date ? row[0] : new Date(row[0]);
+          const dateStr = Utilities.formatDate(dateObj, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          
+          if (targetMonth) {
+            if (!dateStr.startsWith(targetMonth)) continue;
+          }
+          
+          dailyData.push({
+            date: dateStr,
+            userId: String(row[1]),
+            type: row[2] || '',
+            status: row[3] || '',
+            report: row[4] || ''
+          });
+        }
+      }
+      
+      return createSuccessResponse(null, { logs: logs, dailyData: dailyData });
     }
     
     return ContentService.createTextOutput("API is running.");

@@ -216,6 +216,12 @@
         }
 
         /* スマホ用レスポンシブデザイン */
+        @media (max-width: 800px) {
+            #individual-view {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
         @media (max-width: 600px) {
             .admin-header {
                 flex-direction: column;
@@ -252,127 +258,252 @@
                 <p class="subtitle" style="text-align: left; margin: 0; color: var(--text-secondary);">集計・打刻・システム設定の総合管理</p>
             </div>
             
-            <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.5); padding: 10px 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
-                <label style="font-size: 14px; font-weight: bold; color: var(--text-primary);">対象月:</label>
-                <select id="month-select" class="custom-select" style="padding: 8px 15px; font-size: 14px; width: 140px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer;">
-                    <!-- JavaScriptで動的に生成 -->
-                </select>
+            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.5); padding: 10px 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+                    <label style="font-size: 14px; font-weight: bold; color: var(--text-primary); white-space: nowrap;">対象月:</label>
+                    <select id="month-select" style="padding: 8px 15px; font-size: 14px; width: 140px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; outline: none;">
+                        <!-- JavaScriptで動的に生成 -->
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.5); padding: 10px 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+                    <label style="font-size: 14px; font-weight: bold; color: var(--text-primary); white-space: nowrap;">表示対象:</label>
+                    <select id="user-view-select" style="padding: 8px 15px; font-size: 14px; width: 180px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; outline: none;">
+                        <option value="all">📊 全体ダッシュボード</option>
+                        <!-- JavaScriptで動的に生成 -->
+                    </select>
+                </div>
             </div>
         </div>
 
         <!-- メインコンテンツ (認証後に表示) -->
         <main id="admin-content" class="hidden">
             
-            <!-- 月次集計サマリーセクション -->
-            <div class="admin-section">
-                <h3>📊 月次集計サマリー</h3>
-                <div class="summary-cards" id="summary-cards">
-                    <div class="card">
-                        <div class="card-title">今月の所定営業時間</div>
-                        <div class="card-value" id="standard-hours">--時間--分</div>
+            <!-- 全体ダッシュボードビュー -->
+            <div id="all-view">
+                <!-- 月次集計サマリーセクション -->
+                <div class="admin-section">
+                    <h3>📊 月次集計サマリー</h3>
+                    <div class="summary-cards" id="summary-cards">
+                        <div class="card">
+                            <div class="card-title">今月の所定営業時間</div>
+                            <div class="card-value" id="standard-hours">--時間--分</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">全従業員 実労働時間</div>
+                            <div class="card-value" id="total-hours">--時間--分</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">稼働人数</div>
+                            <div class="card-value" id="total-users">--人</div>
+                        </div>
                     </div>
-                    <div class="card">
-                        <div class="card-title">全従業員 実労働時間</div>
-                        <div class="card-value" id="total-hours">--時間--分</div>
+
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ユーザー名</th>
+                                    <th>出勤日数</th>
+                                    <th>総滞在時間</th>
+                                    <th>実労働時間</th>
+                                    <th>残業時間</th>
+                                </tr>
+                            </thead>
+                            <tbody id="aggregation-tbody">
+                                <tr>
+                                    <td colspan="5" style="text-align: center;">データを読み込んでいます...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="card">
-                        <div class="card-title">稼働人数</div>
-                        <div class="card-value" id="total-users">--人</div>
-                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
                 </div>
 
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ユーザー名</th>
-                                <th>出勤日数</th>
-                                <th>総滞在時間</th>
-                                <th>実労働時間</th>
-                                <th>残業時間</th>
-                            </tr>
-                        </thead>
-                        <tbody id="aggregation-tbody">
-                            <tr>
-                                <td colspan="5" style="text-align: center;">データを読み込んでいます...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- 打刻履歴管理セクション -->
+                <div class="admin-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin-bottom: 0;">🕒 打刻履歴の管理</h3>
+                        <button id="btn-open-add-log" class="btn btn-success" style="padding: 8px 15px; font-size: 14px; height: auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(16,185,129,0.3);">＋ 手動追加</button>
+                    </div>
+
+                    <div class="table-container">
+                        <table style="font-size: 14px;">
+                            <thead>
+                                <tr>
+                                    <th>打刻日時</th>
+                                    <th>氏名</th>
+                                    <th>種類</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-tbody">
+                                <tr><td colspan="4" style="text-align: center;">データを読み込んでいます...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
                 </div>
-                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
+
+                <!-- 従業員管理セクション -->
+                <div class="admin-section">
+                    <h3>👥 従業員管理</h3>
+                    <div class="form-row">
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">ユーザーID (半角英数)</label>
+                            <input type="text" id="new-user-id" placeholder="user001">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">氏名</label>
+                            <input type="text" id="new-user-name" placeholder="山田 太郎">
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">休憩時間 (分)</label>
+                            <input type="number" id="new-user-break" placeholder="60">
+                        </div>
+                        <button id="btn-add-user" class="btn btn-primary" style="padding: 10px 20px; height: 42px; border-radius: 8px;">追加 / 更新</button>
+                    </div>
+
+                    <div class="table-container">
+                        <table style="font-size: 14px;">
+                            <thead>
+                                <tr>
+                                    <th>ユーザーID</th>
+                                    <th>氏名</th>
+                                    <th>休憩時間</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-tbody"></tbody>
+                        </table>
+                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
+                </div>
+
+                <!-- システム設定セクション -->
+                <div class="admin-section">
+                    <h3>🔧 システム設定</h3>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="font-weight: 500; color: var(--text-primary);">管理者パスワード</label>
+                        <input type="text" id="setting-password" style="margin-bottom: 15px;">
+                        
+                        <label style="font-weight: 500; color: var(--text-primary);">月次レポート送信先メールアドレス</label>
+                        <input type="email" id="setting-email" style="margin-bottom: 15px;">
+                    </div>
+                    <button id="btn-save-settings" class="btn btn-primary" style="padding: 12px 25px; font-size: 14px; border-radius: 8px;">設定を保存</button>
+                </div>
             </div>
 
-            <!-- 打刻履歴管理セクション -->
-            <div class="admin-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="margin-bottom: 0;">🕒 打刻履歴の管理</h3>
-                    <button id="btn-open-add-log" class="btn btn-success" style="padding: 8px 15px; font-size: 14px; height: auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(16,185,129,0.3);">＋ 手動追加</button>
-                </div>
-
-                <div class="table-container">
-                    <table style="font-size: 14px;">
-                        <thead>
-                            <tr>
-                                <th>打刻日時</th>
-                                <th>氏名</th>
-                                <th>種類</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="log-tbody">
-                            <tr><td colspan="4" style="text-align: center;">データを読み込んでいます...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
-            </div>
-
-            <!-- 従業員管理セクション -->
-            <div class="admin-section">
-                <h3>👥 従業員管理</h3>
-                <div class="form-row">
-                    <div>
-                        <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">ユーザーID (半角英数)</label>
-                        <input type="text" id="new-user-id" placeholder="user001">
+            <!-- 従業員個別詳細勤務表モード (デフォルト非表示、アバター不要版) -->
+            <div id="individual-view" class="hidden" style="display: grid; grid-template-columns: 280px 1fr; gap: 25px; align-items: start; margin-bottom: 25px;">
+                
+                <!-- 左カラム: 個人設定・プロフィールサイドバー -->
+                <div class="admin-section" style="margin-bottom: 0; padding: 20px;">
+                    <h3 style="border-bottom: 3px solid var(--accent-blue); padding-bottom: 6px; margin-bottom: 20px; font-size: 1.1rem; width: 100%;">👤 個人契約設定</h3>
+                    <div style="margin-bottom: 20px;">
+                        <h4 id="profile-name" style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 5px;">-- --</h4>
+                        <p id="profile-email" style="font-size: 13px; color: var(--text-secondary); margin: 0; word-break: break-all;">--@--</p>
                     </div>
-                    <div>
-                        <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">氏名</label>
-                        <input type="text" id="new-user-name" placeholder="山田 太郎">
-                    </div>
-                    <div>
-                        <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">休憩時間 (分)</label>
-                        <input type="number" id="new-user-break" placeholder="60">
-                    </div>
-                    <button id="btn-add-user" class="btn btn-primary" style="padding: 10px 20px; height: 42px; border-radius: 8px;">追加 / 更新</button>
-                </div>
-
-                <div class="table-container">
-                    <table style="font-size: 14px;">
-                        <thead>
-                            <tr>
-                                <th>ユーザーID</th>
-                                <th>氏名</th>
-                                <th>休憩時間</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="user-tbody"></tbody>
-                    </table>
-                </div>
-                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
-            </div>
-
-            <!-- システム設定セクション -->
-            <div class="admin-section">
-                <h3>🔧 システム設定</h3>
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label style="font-weight: 500; color: var(--text-primary);">管理者パスワード</label>
-                    <input type="text" id="setting-password" style="margin-bottom: 15px;">
                     
-                    <label style="font-weight: 500; color: var(--text-primary);">月次レポート送信先メールアドレス</label>
-                    <input type="email" id="setting-email" style="margin-bottom: 15px;">
+                    <div style="border-top: 1px solid rgba(0,0,0,0.06); padding-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                            <span style="color: var(--text-secondary);">勤務契約時間</span>
+                            <span id="profile-times" style="font-weight: 600; color: var(--text-primary);">--:-- 〜 --:--</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                            <span style="color: var(--text-secondary);">設定休憩時間</span>
+                            <span id="profile-break" style="font-weight: 600; color: var(--text-primary);">--分</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                            <span style="color: var(--text-secondary);">月間所定時間</span>
+                            <span id="profile-standard" style="font-weight: 600; color: var(--text-primary);">--時間</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                            <span style="color: var(--text-secondary);">契約基本給与</span>
+                            <span id="profile-salary" style="font-weight: bold; color: var(--success-color);">--円</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px;">
+                            <span style="color: var(--text-secondary);">契約勤務型</span>
+                            <span id="profile-worktype" style="font-weight: 600; color: var(--text-primary);">--</span>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-edit-profile" class="btn btn-primary" style="width: 100%; padding: 10px; border-radius: 8px; font-size: 13px;">🛠️ 個人設定を変更する</button>
                 </div>
-                <button id="btn-save-settings" class="btn btn-primary" style="padding: 12px 25px; font-size: 14px; border-radius: 8px;">設定を保存</button>
+                
+                <!-- 右カラム: 個別勤務表 -->
+                <div>
+                    <!-- 個別アクションヘッダー -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-export-csv" class="btn btn-success" style="padding: 8px 15px; font-size: 13px; font-weight: 600;"><span style="margin-right: 5px;">📥</span>CSVで出力</button>
+                            <!-- デモ用Excelボタン -->
+                            <button onclick="alert('Excel出力はCSV形式でのダウンロードが推奨されています。CSV出力をご利用ください。')" class="btn btn-success" style="padding: 8px 15px; font-size: 13px; font-weight: 600; background: #047857;"><span style="margin-right: 5px;">📊</span>EXCELで出力</button>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <!-- 管理者の代理打刻アクション -->
+                            <button id="btn-proxy-in" class="btn btn-primary" style="padding: 8px 15px; font-size: 13px; background: #2563eb;">出勤ボタン</button>
+                            <button id="btn-proxy-out" class="btn btn-secondary" style="padding: 8px 15px; font-size: 13px; background: #dc2626;">退勤ボタン</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 個別月次集計カード -->
+                    <div class="admin-section" style="padding: 20px; margin-bottom: 25px;">
+                        <h3 style="border-bottom: 3px solid var(--accent-blue); padding-bottom: 6px; margin-bottom: 15px; font-size: 1.1rem;">📊 月別詳細サマリー</h3>
+                        <div class="summary-cards" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+                            <div class="card" style="padding: 12px;">
+                                <div class="card-title" style="font-size: 11px; margin-bottom: 4px;">作業月</div>
+                                <div class="card-value" id="indiv-month" style="font-size: 18px;">--年--月</div>
+                            </div>
+                            <div class="card" style="padding: 12px;">
+                                <div class="card-title" style="font-size: 11px; margin-bottom: 4px;">所定時間</div>
+                                <div class="card-value" id="indiv-standard-hours" style="font-size: 18px;">--時間</div>
+                            </div>
+                            <div class="card" style="padding: 12px;">
+                                <div class="card-title" style="font-size: 11px; margin-bottom: 4px;">稼働時間</div>
+                                <div class="card-value" id="indiv-total-hours" style="font-size: 18px; color: var(--accent-blue);">--時間--分</div>
+                            </div>
+                            <div class="card" style="padding: 12px;">
+                                <div class="card-title" style="font-size: 11px; margin-bottom: 4px;">時間外</div>
+                                <div class="card-value" id="indiv-overtime-hours" style="font-size: 18px; color: var(--accent-red);">--時間--分</div>
+                            </div>
+                            <div class="card" style="padding: 12px;">
+                                <div class="card-title" style="font-size: 11px; margin-bottom: 4px;">稼働日数</div>
+                                <div class="card-value" id="indiv-work-days" style="font-size: 18px;">--日</div>
+                            </div>
+                            <div class="card" style="padding: 12px;">
+                                <div class="card-title" style="font-size: 11px; margin-bottom: 4px;">概算給与</div>
+                                <div class="card-value" id="indiv-earned-salary" style="font-size: 18px; color: var(--success-color); font-weight: bold;">--円</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 日別カレンダー勤務表 -->
+                    <div class="admin-section" style="padding: 20px;">
+                        <h3 style="border-bottom: 3px solid var(--accent-blue); padding-bottom: 6px; margin-bottom: 15px; font-size: 1.1rem;">📅 勤務表詳細</h3>
+                        <div class="table-container">
+                            <table style="font-size: 13px;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60px;">編集</th>
+                                        <th style="width: 60px;">区分</th>
+                                        <th>日付</th>
+                                        <th>開始</th>
+                                        <th>所定終了</th>
+                                        <th>終了</th>
+                                        <th>休憩</th>
+                                        <th>実働</th>
+                                        <th>時間外</th>
+                                        <th style="width: 140px; text-align: center;">承認</th>
+                                        <th>日報</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="indiv-calendar-tbody">
+                                    <!-- JSで1日〜末日まで自動生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
             
         </main>
@@ -443,6 +574,94 @@
             <div style="display: flex; gap: 15px;">
                 <button id="btn-save-new-log" class="btn btn-success" style="flex: 1; padding: 12px; border-radius: 8px;">追加</button>
                 <button onclick="document.getElementById('add-log-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #475569; border-radius: 8px; font-size: 16px;">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 従業員個人設定変更モーダル (アバター不要対応版) -->
+    <div id="edit-profile-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 480px;">
+            <h3 style="border-bottom: 2px solid var(--accent-blue); padding-bottom: 10px; display: inline-block;">個人勤務条件の設定</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">メールアドレス</label>
+                    <input type="email" id="edit-profile-email" placeholder="email@gmail.com">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">契約勤務型</label>
+                    <input type="text" id="edit-profile-worktype" placeholder="勤務タイプ①">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">基本出勤時刻</label>
+                    <input type="text" id="edit-profile-start" placeholder="13:00">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">基本退勤時刻</label>
+                    <input type="text" id="edit-profile-end" placeholder="19:00">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">契約所定労働時間 (時間)</label>
+                    <input type="number" id="edit-profile-standard" placeholder="120">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">基本給与 (円)</label>
+                    <input type="number" id="edit-profile-salary" placeholder="200000">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">設定休憩時間 (分)</label>
+                    <input type="number" id="edit-profile-break" placeholder="60">
+                </div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <button id="btn-save-profile" class="btn btn-primary" style="flex: 1; padding: 12px; border-radius: 8px;">設定を保存</button>
+                <button onclick="document.getElementById('edit-profile-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #475569; border-radius: 8px; font-size: 16px;">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日別勤務データの編集モーダル -->
+    <div id="edit-daily-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 style="border-bottom: 2px solid var(--accent-blue); padding-bottom: 10px; display: inline-block;">日別勤務データの編集</h3>
+            <input type="hidden" id="edit-daily-date">
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">日付</label>
+                <input type="text" id="edit-daily-date-label" readonly style="background: #f1f5f9; color: var(--text-secondary);">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">勤務区分</label>
+                    <select id="edit-daily-type">
+                        <option value="">- 自動判別 -</option>
+                        <option value="出勤">出勤</option>
+                        <option value="有給">有給</option>
+                        <option value="半給">半給</option>
+                        <option value="欠勤">欠勤</option>
+                        <option value="特別休暇">特別休暇</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">承認ステータス</label>
+                    <select id="edit-daily-status">
+                        <option value="">未承認</option>
+                        <option value="承認済み">承認済み</option>
+                        <option value="差戻し">差戻し</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">業務日報 / メモ</label>
+                <input type="text" id="edit-daily-report" placeholder="本日の業務内容やメモ">
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <button id="btn-save-daily" class="btn btn-primary" style="flex: 1; padding: 12px; border-radius: 8px;">保存</button>
+                <button onclick="document.getElementById('edit-daily-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #475569; border-radius: 8px; font-size: 16px;">キャンセル</button>
             </div>
         </div>
     </div>

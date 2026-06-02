@@ -1,10 +1,13 @@
 /**
- * スマート打刻システム - 管理ダッシュボードロジック
+ * スマート打刻システム - 管理ダッシュボードロジック (従業員個別詳細勤務表・契約設定・承認・CSV対応版)
  */
 
 let currentPassword = '';
 let currentUsers = {};
 let holidaysData = {};
+let monthlyLogs = [];
+let monthlyDailyData = [];
+let currentSelectedUserId = 'all'; // 'all' または 従業員ID
 
 document.addEventListener('DOMContentLoaded', () => {
     initMonthSelector();
@@ -15,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => { holidaysData = data; })
         .catch(err => console.error('祝日データの取得に失敗しました', err));
 
+    // イベントリスナーの登録
     document.getElementById('btn-login').addEventListener('click', attemptLogin);
     document.getElementById('admin-password').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') attemptLogin();
@@ -22,12 +26,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
     document.getElementById('btn-add-user').addEventListener('click', saveUser);
-
     document.getElementById('month-select').addEventListener('change', (e) => fetchDashboardData(e.target.value));
+    
+    // 表示対象切り替え
+    document.getElementById('user-view-select').addEventListener('change', handleUserViewChange);
 
+    // 打刻履歴用モーダル
     document.getElementById('btn-open-add-log').addEventListener('click', openAddLogModal);
     document.getElementById('btn-save-log-edit').addEventListener('click', saveLogEdit);
     document.getElementById('btn-save-new-log').addEventListener('click', saveNewLog);
+
+    // 個人プロフィール設定用モーダル
+    document.getElementById('btn-edit-profile').addEventListener('click', openEditProfileModal);
+    document.getElementById('btn-save-profile').addEventListener('click', saveUserProfile);
+
+    // 日別勤務編集用モーダル
+    document.getElementById('btn-save-daily').addEventListener('click', saveDailyEdit);
+
+    // 個別勤務表のアクション
+    document.getElementById('btn-export-csv').addEventListener('click', exportIndividualCSV);
+    document.getElementById('btn-proxy-in').addEventListener('click', () => triggerProxyPunch('出勤'));
+    document.getElementById('btn-proxy-out').addEventListener('click', () => triggerProxyPunch('退勤'));
 });
 
 function initMonthSelector() {
@@ -79,8 +98,8 @@ function calculateMonthlyStandardHours(targetMonth) {
         const isHoliday = !!holidaysData[dateStr];
         
         if (!isHoliday) {
-            if (dayOfWeek >= 1 && dayOfWeek <= 5) totalStandardMinutes += 585; // 9:15-19:00
-            else if (dayOfWeek === 6) totalStandardMinutes += 255;             // 9:15-13:30
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) totalStandardMinutes += 585; // 9:15-19:00 (9.75h)
+            else if (dayOfWeek === 6) totalStandardMinutes += 255;             // 9:15-13:30 (4.25h)
         }
     }
     
@@ -136,13 +155,21 @@ async function fetchDashboardData(monthStr) {
         document.getElementById('setting-email').value = dataSettings.data.email;
         
         renderUserTable(currentUsers);
+        updateUserViewSelector(currentUsers);
         
         if (dataLogs.status === 'success') {
-            renderLogTable(dataLogs.data);
-            renderAggregationDashboard(dataLogs.data, currentUsers);
+            // logs と dailyData の格納
+            monthlyLogs = dataLogs.data.logs || [];
+            monthlyDailyData = dataLogs.data.dailyData || [];
+            
+            renderLogTable(monthlyLogs);
+            renderAggregationDashboard(monthlyLogs, currentUsers);
+            
+            // 現在の選択に応じて再描画
+            refreshCurrentView();
         } else {
             document.getElementById('log-tbody').innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">${dataLogs.message}</td></tr>`;
-            document.getElementById('aggregation-tbody').innerHTML = `<tr><td colspan="4" style="text-align:center; color:red;">${dataLogs.message}</td></tr>`;
+            document.getElementById('aggregation-tbody').innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">${dataLogs.message}</td></tr>`;
         }
 
     } catch (error) {
@@ -157,13 +184,56 @@ async function fetchDashboardData(monthStr) {
     }
 }
 
-// === 集計ダッシュボードの描画 ===
+// ドロップダウンリストに従業員一覧を動的追加
+function updateUserViewSelector(users) {
+    const select = document.getElementById('user-view-select');
+    
+    // 現在の選択値を退避
+    const lastValue = select.value;
+    
+    // 初期状態にリセット
+    select.innerHTML = '<option value="all">📊 全体ダッシュボード</option>';
+    
+    for (const [id, user] of Object.entries(users)) {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = `👤 ${user.name}`;
+        select.appendChild(option);
+    }
+    
+    // 選択を復元（存在すれば）
+    if ([...select.options].some(opt => opt.value === lastValue)) {
+        select.value = lastValue;
+        currentSelectedUserId = lastValue;
+    } else {
+        select.value = 'all';
+        currentSelectedUserId = 'all';
+    }
+}
 
+function handleUserViewChange(e) {
+    currentSelectedUserId = e.target.value;
+    refreshCurrentView();
+}
+
+function refreshCurrentView() {
+    if (currentSelectedUserId === 'all') {
+        document.getElementById('all-view').classList.remove('hidden');
+        document.getElementById('individual-view').classList.add('hidden');
+        renderAggregationDashboard(monthlyLogs, currentUsers);
+    } else {
+        document.getElementById('all-view').classList.add('hidden');
+        document.getElementById('individual-view').classList.remove('hidden');
+        renderIndividualView(currentSelectedUserId);
+    }
+}
+
+// === 全体集計ダッシュボードの描画 ===
 function renderAggregationDashboard(rawData, employeesSettings = {}) {
     const tbody = document.getElementById('aggregation-tbody');
     
     if (!rawData || rawData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center;">この月のデータはありません</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center;">この月のデータはありません</td></tr>`;
         document.getElementById('total-hours').textContent = '0時間 0分';
         document.getElementById('total-users').textContent = '0人';
         return;
@@ -253,8 +323,451 @@ function renderAggregationDashboard(rawData, employeesSettings = {}) {
     document.getElementById('total-users').textContent = `${activeUsersCount}人`;
 }
 
-// === 打刻履歴の管理描画 ===
+// === 従業員個別詳細勤務表の描画 ===
+function renderIndividualView(userId) {
+    const user = currentUsers[userId];
+    if (!user) return;
 
+    // 1. 左サイドバープロフィールの描画 (アバター不要対応)
+    document.getElementById('profile-name').textContent = user.name;
+    document.getElementById('profile-email').textContent = user.email || 'メールアドレス未登録';
+    document.getElementById('profile-times').textContent = (user.startTime && user.endTime) ? `${user.startTime} 〜 ${user.endTime}` : '未設定';
+    document.getElementById('profile-break').textContent = `${user.breakMinutes || 0}分`;
+    document.getElementById('profile-standard').textContent = user.standardHours ? `${user.standardHours}時間` : '未設定';
+    document.getElementById('profile-salary').textContent = user.salary ? `${user.salary.toLocaleString()}円` : '未設定';
+    document.getElementById('profile-worktype').textContent = user.workType || '未設定';
+
+    // 2. カレンダー詳細勤務表の動的生成
+    const monthSelect = document.getElementById('month-select');
+    const monthStr = monthSelect.value; // YYYY-MM
+    const [yyyy, mm] = monthStr.split('-');
+    const year = parseInt(yyyy, 10);
+    const month = parseInt(mm, 10) - 1;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    
+    // 対象月の全打刻を取得
+    const userLogs = monthlyLogs.filter(log => log.userId === userId);
+    
+    // 日付ごとに整理
+    const dailyLogs = {};
+    for (let d = 1; d <= lastDay; d++) {
+        const dayStr = String(d).padStart(2, '0');
+        dailyLogs[dayStr] = { in: null, out: null };
+    }
+    
+    userLogs.forEach(log => {
+        const dObj = new Date(log.serverTime);
+        const dayStr = String(dObj.getDate()).padStart(2, '0');
+        if (dailyLogs[dayStr]) {
+            if (log.type === '出勤' && !dailyLogs[dayStr].in) dailyLogs[dayStr].in = dObj;
+            else if (log.type === '退勤') dailyLogs[dayStr].out = dObj;
+        }
+    });
+
+    const tbody = document.getElementById('indiv-calendar-tbody');
+    let html = '';
+    let totalWorkMinutes = 0;
+    let totalOvertimeMinutes = 0;
+    let actualWorkDays = 0;
+    
+    // 個人設定値
+    const breakMinutes = user.breakMinutes || 0;
+    const defaultStartStr = user.startTime || '09:00';
+    const defaultEndStr = user.endTime || '18:00';
+    
+    const [defStartH, defStartM] = defaultStartStr.split(':').map(Number);
+    const [defEndH, defEndM] = defaultEndStr.split(':').map(Number);
+    const defStartMins = defStartH * 60 + defStartM;
+    const defEndMins = defEndH * 60 + defEndM;
+
+    for (let d = 1; d <= lastDay; d++) {
+        const dayStr = String(d).padStart(2, '0');
+        const dateObj = new Date(year, month, d);
+        const dateKey = `${yyyy}-${mm}-${dayStr}`;
+        const dayOfWeek = dateObj.getDay();
+        const dayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+        const dayLabel = dayLabels[dayOfWeek];
+        
+        // 土・日・祝日判定
+        const isHoliday = !!holidaysData[dateKey];
+        const isSunday = dayOfWeek === 0;
+        const isSaturday = dayOfWeek === 6;
+        
+        let rowClass = '';
+        let dateColorStyle = '';
+        if (isSunday || isHoliday) {
+            rowClass = 'style="background: rgba(239, 68, 68, 0.04);"';
+            dateColorStyle = 'color: var(--accent-red); font-weight: bold;';
+        } else if (isSaturday) {
+            rowClass = 'style="background: rgba(59, 130, 246, 0.04);"';
+            dateColorStyle = 'color: var(--accent-blue); font-weight: bold;';
+        }
+
+        // 打刻データの取得
+        const punch = dailyLogs[dayStr];
+        const inStr = punch.in ? `${String(punch.in.getHours()).padStart(2,'0')}:${String(punch.in.getMinutes()).padStart(2,'0')}` : '-';
+        const outStr = punch.out ? `${String(punch.out.getHours()).padStart(2,'0')}:${String(punch.out.getMinutes()).padStart(2,'0')}` : '-';
+        
+        // 新設の「日別勤務データ」から有給、承認状態、日報を取得
+        const dailyState = monthlyDailyData.find(item => item.date === dateKey && item.userId === userId) || {};
+        
+        // 有給等の「区分」判定
+        let typeVal = dailyState.type || '';
+        if (!typeVal && punch.in && punch.out) {
+            typeVal = '出勤';
+        }
+        
+        // 労働時間の計算
+        let grossMins = 0;
+        let netMins = 0;
+        let overtimeMins = 0;
+        
+        if (punch.in && punch.out) {
+            actualWorkDays++;
+            const inMins = punch.in.getHours() * 60 + punch.in.getMinutes();
+            const outMins = punch.out.getHours() * 60 + punch.out.getMinutes();
+            grossMins = outMins - inMins;
+            if (grossMins < 0) grossMins = 0;
+            
+            // 土曜日は休憩なし、平日は設定休憩時間を適用
+            const todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes;
+            netMins = grossMins - todayBreak;
+            if (netMins < 0) netMins = 0;
+            
+            totalWorkMinutes += netMins;
+            
+            // 時間外(残業)計算: 契約退勤時刻より後の時間、または休日労働
+            let dailyStandardStart = defStartMins;
+            let dailyStandardEnd = defEndMins;
+            if (isSunday || isHoliday) {
+                // 休日はすべて時間外
+                overtimeMins = netMins;
+            } else {
+                for (let m = inMins; m < outMins; m++) {
+                    if (m < dailyStandardStart || m >= dailyStandardEnd) overtimeMins++;
+                }
+            }
+            totalOvertimeMinutes += overtimeMins;
+        }
+
+        const formatMinutes = (mins) => {
+            if (mins === 0) return '-';
+            return `${Math.floor(mins / 60)}時間${mins % 60}分`;
+        };
+
+        // 承認ステータス表示の組み立て
+        let approvalHtml = '';
+        if (dailyState.status === '承認済み') {
+            approvalHtml = '<span style="color: var(--success-color); font-weight: bold;">✅ 承認済み</span>';
+        } else if (dailyState.status === '差戻し') {
+            approvalHtml = '<span style="color: var(--accent-red); font-weight: bold;">❌ 差戻し中</span>';
+        } else {
+            // 未承認時はボタン表示
+            approvalHtml = `
+                <div style="display: flex; gap: 5px; justify-content: center;">
+                    <button class="btn-small btn-success" onclick="updateDailyStatus('${dateKey}', '${userId}', '承認済み')" style="padding: 4px 8px; font-size: 11px;">承認する</button>
+                    <button class="btn-small btn-danger" onclick="updateDailyStatus('${dateKey}', '${userId}', '差戻し')" style="padding: 4px 8px; font-size: 11px;">差戻し</button>
+                </div>
+            `;
+        }
+
+        html += `
+            <tr ${rowClass}>
+                <td><button class="btn-small btn-primary" onclick="openEditDailyModal('${dateKey}', '${userId}', '${typeVal}', '${dailyState.status || ''}', '${dailyState.report || ''}')">編集</button></td>
+                <td><span style="font-weight: 500;">${typeVal || '-'}</span></td>
+                <td><span style="${dateColorStyle}">${yyyy}/${mm}/${dayStr}(${dayLabel})</span></td>
+                <td>${inStr}</td>
+                <td>${user.endTime || '19:00'}</td>
+                <td>${outStr}</td>
+                <td>${punch.in && punch.out ? ((dayOfWeek === 6) ? 0 : breakMinutes) + '分' : '-'}</td>
+                <td><strong>${formatMinutes(netMins)}</strong></td>
+                <td style="color: var(--accent-red);">${formatMinutes(overtimeMins)}</td>
+                <td style="text-align: center;">${approvalHtml}</td>
+                <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${dailyState.report || ''}">${dailyState.report || '-'}</td>
+            </tr>
+        `;
+    }
+
+    tbody.innerHTML = html;
+
+    // 3. 右カラム月次詳細サマリーカードの描画
+    document.getElementById('indiv-month').textContent = `${yyyy}年${mm}月`;
+    document.getElementById('indiv-standard-hours').textContent = user.standardHours ? `${user.standardHours}時間` : '未設定';
+    
+    const formatTimeSummary = (totalMins) => {
+        const h = Math.floor(totalMins / 60);
+        const m = totalMins % 60;
+        return `${h}時間${m}分`;
+    };
+    
+    document.getElementById('indiv-total-hours').textContent = formatTimeSummary(totalWorkMinutes);
+    document.getElementById('indiv-overtime-hours').textContent = formatTimeSummary(totalOvertimeMinutes);
+    document.getElementById('indiv-work-days').textContent = `${actualWorkDays}日`;
+    
+    // 概算給与計算（固定給 or 時給計算）
+    let earnedSalary = user.salary || 0;
+    if (user.salary && user.standardHours && totalWorkMinutes > 0) {
+        // 所定労働時間がある場合は、時給換算で概算 (基本給 / 所定 * 実働)
+        const hourlyRate = user.salary / user.standardHours;
+        const actualHours = totalWorkMinutes / 60;
+        earnedSalary = Math.round(hourlyRate * actualHours);
+    }
+    document.getElementById('indiv-earned-salary').textContent = `${earnedSalary.toLocaleString()}円`;
+}
+
+// === 個人設定条件の編集モーダル制御 ===
+function openEditProfileModal() {
+    const userId = currentSelectedUserId;
+    const user = currentUsers[userId];
+    if (!user) return;
+
+    document.getElementById('edit-profile-email').value = user.email || '';
+    document.getElementById('edit-profile-worktype').value = user.workType || '勤務タイプ①';
+    document.getElementById('edit-profile-start').value = user.startTime || '13:00';
+    document.getElementById('edit-profile-end').value = user.endTime || '19:00';
+    document.getElementById('edit-profile-standard').value = user.standardHours || 120;
+    document.getElementById('edit-profile-salary').value = user.salary || 200000;
+    document.getElementById('edit-profile-break').value = user.breakMinutes || 120;
+
+    document.getElementById('edit-profile-modal').classList.remove('hidden');
+}
+
+async function saveUserProfile() {
+    const userId = currentSelectedUserId;
+    const user = currentUsers[userId];
+    if (!user) return;
+
+    const email = document.getElementById('edit-profile-email').value.trim();
+    const worktype = document.getElementById('edit-profile-worktype').value.trim();
+    const start = document.getElementById('edit-profile-start').value.trim();
+    const end = document.getElementById('edit-profile-end').value.trim();
+    const standard = parseInt(document.getElementById('edit-profile-standard').value, 10) || 0;
+    const salary = parseInt(document.getElementById('edit-profile-salary').value, 10) || 0;
+    const breakMins = parseInt(document.getElementById('edit-profile-break').value, 10) || 0;
+
+    const payload = {
+        action: 'save_user',
+        adminPassword: currentPassword,
+        user: {
+            id: userId,
+            name: user.name,
+            breakMinutes: breakMins,
+            email: email,
+            startTime: start,
+            endTime: end,
+            standardHours: standard,
+            salary: salary,
+            workType: worktype,
+            avatarUrl: '' // アバター不要のため空文字で統一
+        }
+    };
+
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.remove('hidden');
+    
+    try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert('個人勤務設定を更新しました。');
+            document.getElementById('edit-profile-modal').classList.add('hidden');
+            // リロード
+            await fetchDashboardData(document.getElementById('month-select').value);
+        } else {
+            alert('エラー: ' + result.message);
+        }
+    } catch (err) {
+        alert('通信エラー: ' + err.message);
+    } finally {
+        overlay.classList.add('hidden');
+    }
+}
+
+// === 日別勤務ステータスの変更・編集モーダル制御 ===
+async function updateDailyStatus(date, userId, status) {
+    const payload = {
+        action: 'update_daily_status',
+        adminPassword: currentPassword,
+        date: date,
+        userId: userId,
+        status: status
+    };
+
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.remove('hidden');
+
+    try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            // 再読み込みして最新データを反映
+            await fetchDashboardData(document.getElementById('month-select').value);
+        } else {
+            alert('エラー: ' + result.message);
+        }
+    } catch (err) {
+        alert('通信エラー: ' + err.message);
+    } finally {
+        overlay.classList.add('hidden');
+    }
+}
+
+function openEditDailyModal(date, userId, type, status, report) {
+    document.getElementById('edit-daily-date').value = date;
+    document.getElementById('edit-daily-date-label').value = date;
+    document.getElementById('edit-daily-type').value = type;
+    document.getElementById('edit-daily-status').value = status;
+    document.getElementById('edit-daily-report').value = report || '';
+
+    document.getElementById('edit-daily-modal').classList.remove('hidden');
+}
+
+async function saveDailyEdit() {
+    const date = document.getElementById('edit-daily-date').value;
+    const userId = currentSelectedUserId;
+    const type = document.getElementById('edit-daily-type').value;
+    const status = document.getElementById('edit-daily-status').value;
+    const report = document.getElementById('edit-daily-report').value.trim();
+
+    const payload = {
+        action: 'update_daily_status',
+        adminPassword: currentPassword,
+        date: date,
+        userId: userId,
+        type: type,
+        status: status,
+        report: report
+    };
+
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.remove('hidden');
+
+    try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert('日別データを更新しました。');
+            document.getElementById('edit-daily-modal').classList.add('hidden');
+            await fetchDashboardData(document.getElementById('month-select').value);
+        } else {
+            alert('エラー: ' + result.message);
+        }
+    } catch (err) {
+        alert('通信エラー: ' + err.message);
+    } finally {
+        overlay.classList.add('hidden');
+    }
+}
+
+// === 管理者の代理打刻機能 ===
+async function triggerProxyPunch(punchType) {
+    const userId = currentSelectedUserId;
+    const user = currentUsers[userId];
+    if (!user) return;
+
+    if (!confirm(`${user.name} さんの代わりに本日（現在時刻）の「${punchType}」を記録しますか？`)) return;
+
+    const payload = {
+        action: 'add_log',
+        adminPassword: currentPassword,
+        userId: userId,
+        userName: user.name,
+        type: punchType,
+        serverTime: new Date().toISOString(),
+        clientTime: '管理者代理打刻'
+    };
+
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.remove('hidden');
+
+    try {
+        const response = await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert(`${punchType}を代理記録しました。`);
+            await fetchDashboardData(document.getElementById('month-select').value);
+        } else {
+            alert('エラー: ' + result.message);
+        }
+    } catch (err) {
+        alert('通信エラー: ' + err.message);
+    } finally {
+        overlay.classList.add('hidden');
+    }
+}
+
+// === CSVエクスポート機能 (BOM付UTF-8によるExcel文字化け防止) ===
+function exportIndividualCSV() {
+    const userId = currentSelectedUserId;
+    const user = currentUsers[userId];
+    if (!user) return;
+
+    const monthStr = document.getElementById('month-select').value;
+    const filename = `timecard_${user.name}_${monthStr}.csv`;
+    
+    // CSVヘッダーの組み立て
+    let csvRows = [];
+    csvRows.push(`"スマート出退勤管理システム - 月間詳細勤務表"`);
+    csvRows.push(`"従業員名","${user.name}","対象月","${monthStr}"`);
+    csvRows.push(`"契約時間","${user.startTime || '13:00'}〜${user.endTime || '19:00'}","設定休憩","${user.breakMinutes || 0}分"`);
+    csvRows.push(`"基本給与","${user.salary || 0}円","所定時間","${user.standardHours || 0}時間"`);
+    csvRows.push(''); // 空行
+    
+    csvRows.push(`"区分","日付","開始時刻","退勤時刻","休憩時間","実労働時間","時間外労働","承認ステータス","業務日報メモ"`);
+
+    const tableRows = document.querySelectorAll('#indiv-calendar-tbody tr');
+    tableRows.forEach(row => {
+        const cols = row.querySelectorAll('td');
+        if (cols.length >= 11) {
+            const type = cols[1].textContent.trim();
+            const date = cols[2].textContent.trim();
+            const start = cols[3].textContent.trim();
+            const end = cols[5].textContent.trim();
+            const rest = cols[6].textContent.trim();
+            const net = cols[7].textContent.trim();
+            const over = cols[8].textContent.trim();
+            const status = cols[9].textContent.trim();
+            const report = cols[10].textContent.trim();
+            
+            csvRows.push(`"${type}","${date}","${start}","${end}","${rest}","${net}","${over}","${status}","${report}"`);
+        }
+    });
+
+    const csvContent = csvRows.join('\r\n');
+    
+    // BOM付きUTF-8
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    if (window.navigator.msSaveOrOpenBlob) {
+        window.navigator.msSaveBlob(blob, filename);
+    } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+}
+
+// === 打刻履歴の管理描画 ===
 function renderLogTable(logs) {
     const tbody = document.getElementById('log-tbody');
     let html = '';
@@ -351,7 +864,6 @@ async function deleteLog(rowNumber) {
 }
 
 // === 従業員・システム設定の管理描画 ===
-
 function renderUserTable(usersData) {
     const tbody = document.getElementById('user-tbody');
     let html = '';
