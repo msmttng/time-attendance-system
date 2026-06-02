@@ -27,19 +27,48 @@
             gap: 10px;
             margin-bottom: 15px;
             align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .form-row > div {
+            flex: 1;
+            min-width: 150px;
         }
         .form-row input {
-            flex: 1;
+            width: 100%;
             padding: 10px 15px;
             border: 2px solid #e2e8f0;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 14px;
+            box-sizing: border-box;
         }
         .table-container {
             overflow-x: auto;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            color: var(--text-primary);
+        }
+        th {
+            background: rgba(0, 0, 0, 0.03);
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        tr:last-child td {
+            border-bottom: none;
         }
         .btn-small {
-            padding: 5px 10px;
+            padding: 6px 12px;
             font-size: 0.85rem;
             border-radius: 6px;
         }
@@ -53,42 +82,26 @@
     </style>
 </head>
 <body>
-    <div class="glass-container" style="max-width: 800px;">
-        <div class="header">
-            <h1 class="title">⚙️ システム管理画面</h1>
+    <div class="background-animation"></div>
+    <div class="container glass-panel" style="max-width: 800px; padding: 30px;">
+        <header>
+            <h1>⚙️ システム管理画面</h1>
             <p class="subtitle">従業員設定とシステム設定</p>
-        </div>
-
-        <!-- 認証用オーバーレイ -->
-        <div id="password-overlay" class="password-overlay">
-            <div class="password-box">
-                <h2>認証が必要です</h2>
-                <p>管理パスワードを入力してください</p>
-                <input type="password" id="admin-password" placeholder="パスワード" class="custom-select" style="margin-bottom: 15px;">
-                <button id="btn-login" class="btn btn-primary" style="width: 100%;">ログイン</button>
-                <p id="password-error" class="status-message status-error" style="display: block; margin-top: 10px;"></p>
-            </div>
-        </div>
-
-        <!-- ローディングオーバーレイ -->
-        <div id="loading-overlay" class="loading-overlay hidden">
-            <div class="spinner"></div>
-            <p>通信中...</p>
-        </div>
+        </header>
 
         <!-- メインコンテンツ (認証後に表示) -->
-        <div id="admin-content" class="hidden">
+        <main id="admin-content" class="hidden">
             
             <!-- システム設定セクション -->
             <div class="admin-section">
                 <h3>システム設定</h3>
                 <div class="form-group">
                     <label>管理者パスワード</label>
-                    <input type="text" id="setting-password" class="custom-select" style="margin-bottom: 10px;">
+                    <input type="text" id="setting-password" class="custom-select" style="margin-bottom: 15px;">
                     <label>月次レポート送信先メールアドレス</label>
-                    <input type="email" id="setting-email" class="custom-select" style="margin-bottom: 10px;">
+                    <input type="email" id="setting-email" class="custom-select" style="margin-bottom: 15px;">
                 </div>
-                <button id="btn-save-settings" class="btn btn-primary">設定を保存</button>
+                <button id="btn-save-settings" class="btn btn-primary" style="padding: 10px 20px; font-size: 14px;">設定を保存</button>
             </div>
 
             <!-- 従業員管理セクション -->
@@ -97,22 +110,22 @@
                 
                 <div class="form-row">
                     <div>
-                        <label style="font-size: 0.85rem;">ユーザーID (半角英数)</label>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary);">ユーザーID (半角英数)</label>
                         <input type="text" id="new-user-id" placeholder="user001">
                     </div>
                     <div>
-                        <label style="font-size: 0.85rem;">氏名</label>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary);">氏名</label>
                         <input type="text" id="new-user-name" placeholder="山田 太郎">
                     </div>
                     <div>
-                        <label style="font-size: 0.85rem;">休憩時間 (分)</label>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary);">休憩時間 (分)</label>
                         <input type="number" id="new-user-break" placeholder="60">
                     </div>
-                    <button id="btn-add-user" class="btn btn-primary" style="padding: 10px 20px;">追加 / 更新</button>
+                    <button id="btn-add-user" class="btn btn-primary" style="padding: 10px 20px; height: 42px;">追加 / 更新</button>
                 </div>
 
                 <div class="table-container">
-                    <table class="data-table">
+                    <table>
                         <thead>
                             <tr>
                                 <th>ユーザーID</th>
@@ -127,13 +140,32 @@
                     </table>
                 </div>
             </div>
-
-            <div class="footer-links" style="margin-top: 20px;">
-                <a href="index.html" class="link-btn">🔙 打刻画面へ戻る</a>
-                <a href="dashboard.html" class="link-btn" style="margin-left: 10px;">📊 ダッシュボード</a>
-            </div>
             
+        </main>
+        
+        <footer>
+            <div class="footer-links" style="margin-top: 20px;">
+                <a href="index.html" class="link-btn" style="display: inline-block; margin-bottom: 10px;">🔙 打刻画面へ戻る</a>
+                <a href="dashboard.html" class="link-btn" style="display: inline-block; margin-left: 10px;">📊 ダッシュボード</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 認証用オーバーレイ -->
+    <div id="password-overlay" class="overlay">
+        <div class="glass-panel" style="padding: 30px; border-radius: 16px; text-align: center; max-width: 350px; width: 90%;">
+            <h2 style="margin-bottom: 20px; font-size: 20px;">🔒 認証が必要です</h2>
+            <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">管理パスワードを入力してください</p>
+            <input type="password" id="admin-password" placeholder="パスワード" class="custom-select" style="margin-bottom: 15px; text-align: center;">
+            <button id="btn-login" class="btn btn-primary" style="width: 100%;">ログイン</button>
+            <p id="password-error" style="color: var(--accent-red); font-size: 12px; margin-top: 10px; min-height: 15px;"></p>
         </div>
+    </div>
+
+    <!-- ローディングオーバーレイ -->
+    <div id="loading-overlay" class="overlay hidden">
+        <div class="spinner"></div>
+        <p>通信中...</p>
     </div>
 
     <script src="script.js"></script>
