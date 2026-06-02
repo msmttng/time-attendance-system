@@ -334,7 +334,8 @@ function renderIndividualView(userId) {
     document.getElementById('profile-times').textContent = (user.startTime && user.endTime) ? `${user.startTime} 〜 ${user.endTime}` : '未設定';
     document.getElementById('profile-break').textContent = `${user.breakMinutes || 0}分`;
     document.getElementById('profile-standard').textContent = user.standardHours ? `${user.standardHours}時間` : '未設定';
-    document.getElementById('profile-salary').textContent = user.salary ? `${user.salary.toLocaleString()}円` : '未設定';
+    const salaryLabel = user.workType === 'パート・アルバイト' ? '時給' : '月給';
+    document.getElementById('profile-salary').textContent = user.salary ? `${salaryLabel} ${user.salary.toLocaleString()}円` : '未設定';
     document.getElementById('profile-worktype').textContent = user.workType || '未設定';
 
     // 2. カレンダー詳細勤務表の動的生成
@@ -507,12 +508,14 @@ function renderIndividualView(userId) {
     document.getElementById('indiv-work-days').textContent = `${actualWorkDays}日`;
     
     // 概算給与計算（固定給 or 時給計算）
-    let earnedSalary = user.salary || 0;
-    if (user.salary && user.standardHours && totalWorkMinutes > 0) {
-        // 所定労働時間がある場合は、時給換算で概算 (基本給 / 所定 * 実働)
-        const hourlyRate = user.salary / user.standardHours;
+    let earnedSalary = 0;
+    if (user.workType === 'パート・アルバイト') {
+        // パートは時給計算: 時給 × 実働時間
         const actualHours = totalWorkMinutes / 60;
-        earnedSalary = Math.round(hourlyRate * actualHours);
+        earnedSalary = Math.round((user.salary || 0) * actualHours);
+    } else {
+        // 常勤は固定給そのまま
+        earnedSalary = user.salary || 0;
     }
     document.getElementById('indiv-earned-salary').textContent = `${earnedSalary.toLocaleString()}円`;
 }
