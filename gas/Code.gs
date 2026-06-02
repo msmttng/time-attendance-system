@@ -1,68 +1,161 @@
 /**
- * スマート打刻システム - GAS バックエンド (実務ルール完全対応版)
+ * スマート打刻システム - GAS バックエンド (専用管理画面対応版)
  */
 
-const SHEET_NAME = '打刻履歴';
+const LOG_SHEET_NAME = '打刻履歴';
+const EMP_SHEET_NAME = '従業員';
+const SETTING_SHEET_NAME = '設定';
 
-// --- 管理者設定 ---
-const DASHBOARD_PASSWORD = 'admin'; 
-const ADMIN_EMAIL = 'your-email@gmail.com'; 
-
-// --- ユーザーごとの休憩設定（分単位） ---
-// ※フロントエンドの config.js と同じ内容を設定してください
-const USER_SETTINGS = {
-    'user001': { name: '山田 太郎', breakMinutes: 120 }, 
-    'user002': { name: '佐藤 花子', breakMinutes: 60 },  
-    'user003': { name: '鈴木 一郎', breakMinutes: 0 },   
-    'user004': { name: '高橋 美咲', breakMinutes: 90 }   
-};
-
-function doPost(e) {
-  try {
-    let payload = JSON.parse(e.postData.contents);
-    const { userId, userName, type, timestamp } = payload;
-    
-    const serverTime = new Date();
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
-
-    const typeText = type === 'in' ? '出勤' : (type === 'out' ? '退勤' : type);
-
-    sheet.appendRow([serverTime, userId, userName, typeText, timestamp]);
-
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'success',
-      message: '打刻が正常に記録されました。',
-      serverTime: serverTime.toISOString()
-    })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'error',
-      message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
+// --- 初期化 (シートが無い場合に作成する) ---
+function setupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  if (!ss.getSheetByName(LOG_SHEET_NAME)) {
+    const sheet = ss.insertSheet(LOG_SHEET_NAME);
+    sheet.appendRow(['サーバー時刻', 'ユーザーID', '氏名', '打刻種類', 'クライアント時刻']);
+  }
+  
+  if (!ss.getSheetByName(EMP_SHEET_NAME)) {
+    const sheet = ss.insertSheet(EMP_SHEET_NAME);
+    sheet.appendRow(['ユーザーID', '氏名', '休憩時間(分)']);
+    sheet.appendRow(['user001', '山田 太郎', 120]);
+    sheet.appendRow(['user002', '佐藤 花子', 60]);
+  }
+  
+  if (!ss.getSheetByName(SETTING_SHEET_NAME)) {
+    const sheet = ss.insertSheet(SETTING_SHEET_NAME);
+    sheet.appendRow(['設定項目', '値']);
+    sheet.appendRow(['ダッシュボードパスワード', 'admin']);
+    sheet.appendRow(['管理者メールアドレス', 'your-email@gmail.com']);
   }
 }
 
+// --- 設定値の取得 ---
+function getSettings() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME);
+  if (!sheet) { setupSheets(); return { password: 'admin', email: 'your-email@gmail.com' }; }
+  
+  const data = sheet.getDataRange().getValues();
+  let settings = { password: 'admin', email: 'your-email@gmail.com' };
+  
+  for (let i = 0; i < data.length; i++) {
+    if (data[i][0] === 'ダッシュボードパスワード') settings.password = data[i][1];
+    if (data[i][0] === '管理者メールアドレス') settings.email = data[i][1];
+  }
+  return settings;
+}
+
+// --- 従業員リストの取得 ---
+function getEmployees() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EMP_SHEET_NAME);
+  if (!sheet) { setupSheets(); return {}; }
+  
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return {};
+  
+  let employees = {};
+  for (let i = 1; i < data.length; i++) {
+    const id = data[i][0];
+    const name = data[i][1];
+    const breakMins = parseInt(data[i][2], 10) || 0;
+    if (id) employees[String(id)] = { name: name, breakMinutes: breakMins };
+  }
+  return employees;
+}
+
+// --- 打刻と管理機能の受付 (POST) ---
+function doPost(e) {
+  try {
+    let payload = JSON.parse(e.postData.contents);
+    const action = payload.action || 'clock_in_out'; // デフォルトは打刻
+    
+    const settings = getSettings();
+
+    // --- 設定保存アクション ---
+    if (action === 'save_settings') {
+      if (payload.adminPassword !== settings.password) throw new Error('認証エラー');
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTING_SHEET_NAME);
+      const data = sheet.getDataRange().getValues();
+      for (let i = 0; i < data.length; i++) {
+        if (data[i][0] === 'ダッシュボードパスワード') sheet.getRange(i+1, 2).setValue(payload.settings.password);
+        if (data[i][0] === '管理者メールアドレス') sheet.getRange(i+1, 2).setValue(payload.settings.email);
+      }
+      return createSuccessResponse('設定を保存しました。');
+    }
+    
+    // --- 従業員追加/更新アクション ---
+    if (action === 'save_user') {
+      if (payload.adminPassword !== settings.password) throw new Error('認証エラー');
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EMP_SHEET_NAME);
+      const data = sheet.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(payload.user.id)) {
+          sheet.getRange(i+1, 2).setValue(payload.user.name);
+          sheet.getRange(i+1, 3).setValue(payload.user.breakMinutes);
+          found = true;
+          break;
+        }
+      }
+      if (!found) sheet.appendRow([payload.user.id, payload.user.name, payload.user.breakMinutes]);
+      return createSuccessResponse('従業員を保存しました。');
+    }
+    
+    // --- 従業員削除アクション ---
+    if (action === 'delete_user') {
+      if (payload.adminPassword !== settings.password) throw new Error('認証エラー');
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(EMP_SHEET_NAME);
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(payload.userId)) {
+          sheet.deleteRow(i+1);
+          return createSuccessResponse('従業員を削除しました。');
+        }
+      }
+      throw new Error('ユーザーが見つかりません。');
+    }
+
+    // --- 打刻アクション (通常) ---
+    if (action === 'clock_in_out') {
+      const { userId, userName, type, timestamp } = payload;
+      const serverTime = new Date();
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      if (!sheet) { setupSheets(); throw new Error(`シート「${LOG_SHEET_NAME}」が見つかりません。`); }
+      const typeText = type === 'in' ? '出勤' : (type === 'out' ? '退勤' : type);
+      sheet.appendRow([serverTime, userId, userName, typeText, timestamp]);
+      return createSuccessResponse('打刻が正常に記録されました。');
+    }
+
+  } catch (error) {
+    return createErrorResponse(error.message);
+  }
+}
+
+// --- データ取得 (GET) ---
 function doGet(e) {
   try {
     const action = e.parameter.action;
     
+    if (action === 'get_users') {
+      const users = getEmployees();
+      return createSuccessResponse(null, users);
+    }
+    
+    if (action === 'get_settings') {
+      const settings = getSettings();
+      if (e.parameter.password !== settings.password) throw new Error('認証エラー');
+      return createSuccessResponse(null, settings);
+    }
+    
     if (action === 'get_data') {
-      if (e.parameter.password !== DASHBOARD_PASSWORD) {
-        return ContentService.createTextOutput(JSON.stringify({ 
-          status: 'error', 
-          message: 'パスワードが間違っています。' 
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
+      const settings = getSettings();
+      if (e.parameter.password !== settings.password) throw new Error('パスワードが間違っています。');
 
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-      if (!sheet) throw new Error(`シートが見つかりません。`);
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      if (!sheet) { setupSheets(); return createSuccessResponse(null, []); }
       
       const data = sheet.getDataRange().getValues();
-      if (data.length <= 1) {
-        return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: [] })).setMimeType(ContentService.MimeType.JSON);
-      }
+      if (data.length <= 1) return createSuccessResponse(null, []);
       
       const rows = data.slice(1);
       const targetMonth = e.parameter.month;
@@ -81,26 +174,38 @@ function doGet(e) {
         return `${yyyy}-${mm}` === targetMonth;
       });
       
-      const output = ContentService.createTextOutput(JSON.stringify({ status: 'success', data: resultData }));
-      output.setMimeType(ContentService.MimeType.JSON);
-      return output;
+      return createSuccessResponse(null, resultData);
     }
     
     return ContentService.createTextOutput("API is running.");
     
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: error.message })).setMimeType(ContentService.MimeType.JSON);
+    return createErrorResponse(error.message);
   }
 }
 
+function createSuccessResponse(message, data) {
+  const obj = { status: 'success' };
+  if (message) obj.message = message;
+  if (data) obj.data = data;
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function createErrorResponse(message) {
+  return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: message })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- 月次集計とメール送信 ---
 function monthlyAggregationAndNotify() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
   if (!sheet) return;
   
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return;
   
   const rows = data.slice(1);
+  const settings = getSettings();
+  const employees = getEmployees();
   
   const today = new Date();
   today.setMonth(today.getMonth() - 1);
@@ -151,7 +256,7 @@ function monthlyAggregationAndNotify() {
     hasData = true;
     const user = userLogs[userId];
     
-    const breakMinutes = (USER_SETTINGS && USER_SETTINGS[userId]) ? USER_SETTINGS[userId].breakMinutes : 0;
+    const breakMinutes = employees[userId] ? employees[userId].breakMinutes : 0;
     
     let totalNetMinutes = 0;
     let totalOvertimeMinutes = 0;
@@ -170,7 +275,7 @@ function monthlyAggregationAndNotify() {
       let grossMins = outMins - inMins;
       if (grossMins < 0) grossMins = 0;
       
-      let todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes;
+      let todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes; // 土曜は休憩なし
       let netMins = grossMins - todayBreak;
       if (netMins < 0) netMins = 0;
       totalNetMinutes += netMins;
@@ -212,10 +317,10 @@ function monthlyAggregationAndNotify() {
   
   reportText += `\n詳細はダッシュボードからご確認ください。`;
 
-  if (ADMIN_EMAIL !== 'your-email@gmail.com') {
+  if (settings.email && settings.email !== 'your-email@gmail.com') {
     try {
       MailApp.sendEmail({
-        to: ADMIN_EMAIL,
+        to: settings.email,
         subject: `【自動集計】${targetYear}年${targetMonth}月度 労働時間レポート`,
         body: reportText
       });

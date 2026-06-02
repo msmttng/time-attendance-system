@@ -117,15 +117,19 @@ async function fetchDashboardData() {
     overlay.classList.remove('hidden');
 
     try {
-        const response = await fetch(`${GAS_WEB_APP_URL}?action=get_data&month=${targetMonth}&password=${encodeURIComponent(currentPassword)}`, {
-            method: 'GET'
-        });
+        // 同時に設定（ユーザーリスト）も取得する
+        const [resData, resUsers] = await Promise.all([
+            fetch(`${GAS_WEB_APP_URL}?action=get_data&month=${targetMonth}&password=${encodeURIComponent(currentPassword)}`),
+            fetch(`${GAS_WEB_APP_URL}?action=get_users`)
+        ]);
         
-        const result = await response.json();
+        const result = await resData.json();
+        const usersResult = await resUsers.json();
+        const employeesSettings = (usersResult.status === 'success') ? usersResult.data : {};
         
         if (result.status === 'success') {
             pwdOverlay.classList.add('hidden');
-            renderTable(result.data);
+            renderTable(result.data, employeesSettings);
         } else {
             pwdOverlay.classList.remove('hidden');
             errorText.textContent = result.message || 'データ取得に失敗しました';
@@ -140,7 +144,7 @@ async function fetchDashboardData() {
     }
 }
 
-function renderTable(rawData) {
+function renderTable(rawData, employeesSettings = {}) {
     const tbody = document.getElementById('aggregation-tbody');
     
     if (!rawData || rawData.length === 0) {
@@ -182,8 +186,8 @@ function renderTable(rawData) {
         activeUsersCount++;
         const user = userLogs[userId];
         
-        // config.js からユーザーごとの休憩設定を取得（未定義なら0分）
-        const breakMinutes = (USER_SETTINGS && USER_SETTINGS[userId]) ? USER_SETTINGS[userId].breakMinutes : 0;
+        // employeesSettings からユーザーごとの休憩設定を取得（未定義なら0分）
+        const breakMinutes = (employeesSettings[userId]) ? employeesSettings[userId].breakMinutes : 0;
         
         let totalNetMinutes = 0;
         let totalOvertimeMinutes = 0;

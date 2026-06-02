@@ -32,16 +32,32 @@ document.addEventListener('DOMContentLoaded', () => {
     initUserSelect(); // ユーザーリストの生成
 });
 
-// config.js の設定からユーザーリストを生成
-function initUserSelect() {
+// GASから従業員リストを取得してプルダウンを生成
+async function initUserSelect() {
     const select = document.getElementById('user-select');
-    if (typeof USER_SETTINGS !== 'undefined') {
-        for (const [id, user] of Object.entries(USER_SETTINGS)) {
-            const option = document.createElement('option');
-            option.value = id;
-            option.textContent = user.name;
-            select.appendChild(option);
+    
+    if (GAS_WEB_APP_URL.includes('YOUR_SCRIPT_ID_HERE')) {
+        // デモ用データ
+        select.innerHTML = '<option value="" disabled selected>選択してください</option><option value="user001">山田 太郎 (デモ)</option><option value="user002">佐藤 花子 (デモ)</option>';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${GAS_WEB_APP_URL}?action=get_users`);
+        const result = await response.json();
+        
+        if (result.status === 'success' && result.data) {
+            select.innerHTML = '<option value="" disabled selected>選択してください</option>';
+            for (const [id, user] of Object.entries(result.data)) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = user.name;
+                select.appendChild(option);
+            }
         }
+    } catch (error) {
+        console.error('従業員リストの取得に失敗:', error);
+        select.innerHTML = '<option value="" disabled selected>通信エラー</option>';
     }
 }
 
