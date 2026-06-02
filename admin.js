@@ -898,6 +898,14 @@ function editUser(id, name, breakMins) {
     document.getElementById('new-user-id').value = id;
     document.getElementById('new-user-name').value = name;
     document.getElementById('new-user-break').value = breakMins;
+    
+    // UX改善: ボタンの見た目を変え、上部へスクロールする
+    const btn = document.getElementById('btn-add-user');
+    btn.innerHTML = `✅ ${name} さんの情報を更新`;
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-success');
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function saveSettings() {
@@ -915,17 +923,35 @@ async function saveUser() {
     const breakMins = document.getElementById('new-user-break').value;
     if (!id || !name || breakMins === '') { alert('すべての項目を入力してください'); return; }
     const payload = { action: 'save_user', adminPassword: currentPassword, user: { id: id, name: name, breakMinutes: parseInt(breakMins, 10) } };
-    await sendPostRequest(payload, '従業員を保存しました。');
+    
+    // UX改善: ボタンを元に戻す
+    const btn = document.getElementById('btn-add-user');
+    btn.innerHTML = '追加 / 更新';
+    btn.classList.remove('btn-success');
+    btn.classList.add('btn-primary');
+    
+    await sendPostRequest(payload, '従業員情報を保存しました。');
+    
     document.getElementById('new-user-id').value = '';
     document.getElementById('new-user-name').value = '';
     document.getElementById('new-user-break').value = '';
+    
     fetchDashboardData(document.getElementById('month-select').value);
 }
 
 async function deleteUser(id) {
     if (!confirm(`ユーザーID: ${id} を削除しますか？`)) return;
     const payload = { action: 'delete_user', adminPassword: currentPassword, userId: id };
+    
+    // ローカル上でも即座に消すことでUXを向上させる
+    if (currentUsers[id]) {
+        delete currentUsers[id];
+        renderUserTable(currentUsers);
+        updateUserViewSelector(currentUsers);
+    }
+    
     await sendPostRequest(payload, '従業員を削除しました。');
+    
     fetchDashboardData(document.getElementById('month-select').value);
 }
 
