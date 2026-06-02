@@ -471,11 +471,13 @@ function renderIndividualView(userId) {
             `;
         }
 
+        const shortDateStr = `${parseInt(mm, 10)}/${dayStr}(${dayLabel})`;
+
         html += `
             <tr ${rowClass}>
                 <td><button class="btn-small btn-primary" onclick="openEditDailyModal('${dateKey}', '${userId}', '${typeVal}', '${dailyState.status || ''}', '${dailyState.report || ''}')">編集</button></td>
                 <td><span style="font-weight: 500;">${typeVal || '-'}</span></td>
-                <td><span style="${dateColorStyle}">${yyyy}/${mm}/${dayStr}(${dayLabel})</span></td>
+                <td><span style="${dateColorStyle}">${shortDateStr}</span></td>
                 <td>${inStr}</td>
                 <td>${user.endTime || '19:00'}</td>
                 <td>${outStr}</td>
