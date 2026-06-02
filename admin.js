@@ -878,7 +878,7 @@ function renderUserTable(usersData) {
                 <td>${id}</td><td>${user.name}</td><td>${user.breakMinutes} 分</td>
                 <td>
                     <button class="btn-small btn-danger" onclick="deleteUser('${id}')">削除</button>
-                    <button class="btn-small btn-primary" onclick="editUser('${id}', '${user.name}', ${user.breakMinutes})" style="margin-left: 5px;">編集</button>
+                    <button class="btn-small btn-primary" onclick="editUser('${id}', '${user.name}', '${user.breakMinutes || 0}')" style="margin-left: 5px;">編集</button>
                 </td>
             </tr>
         `;
