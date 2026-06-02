@@ -38,10 +38,10 @@
 
         /* 中央寄せと適正な幅設定 (右寄り問題を解消) */
         body .container {
-            max-width: 1100px; /* 視認性向上のため少し広く */
+            max-width: 1250px; /* 少し広くして左右バランスをとる */
             margin: 0 auto;
             padding: 35px 40px;
-            width: 92%;
+            width: 95%;
             border-radius: 16px;
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
@@ -397,9 +397,46 @@
             </div>
 
             <!-- 従業員個別詳細勤務表モード (視認性改善のブルーテーマ版) -->
-            <div id="individual-view" class="hidden" style="display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; margin-bottom: 25px;">
+            <div id="individual-view" class="hidden" style="display: grid; grid-template-columns: 250px 1fr; gap: 20px; align-items: start; margin-bottom: 25px;">
                 
-                <!-- 上部: 個人設定・プロフィール -->
+                <!-- 左カラム: 個人設定・プロフィールサイドバー -->
+                <div class="admin-section" style="margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                    <div>
+                        <h3 style="border: none; font-size: 1.1rem; width: 100%; margin-bottom: 15px;">👤 個人契約設定</h3>
+                        <div style="margin-bottom: 20px; padding-left: 5px;">
+                            <h4 id="profile-name" style="font-size: 20px; font-weight: 700; color: var(--primary-blue); margin-bottom: 5px;">-- --</h4>
+                            <p id="profile-email" style="font-size: 13px; color: var(--text-secondary); margin: 0; word-break: break-all;">--@--</p>
+                        </div>
+                        
+                        <div style="border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">勤務契約時間</span>
+                                <span id="profile-times" style="font-weight: 600; color: var(--text-primary);">--:-- 〜 --:--</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">設定休憩時間</span>
+                                <span id="profile-break" style="font-weight: 600; color: var(--text-primary);">--分</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">月間所定時間</span>
+                                <span id="profile-standard" style="font-weight: 600; color: var(--text-primary);">--時間</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">基本給与 / 時給</span>
+                                <span id="profile-salary" style="font-weight: 600; color: var(--text-primary);">--円</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+                                <span style="color: var(--text-secondary);">勤務形態</span>
+                                <span id="profile-worktype" style="font-weight: 600; color: var(--text-primary);">--</span>
+                            </div>
+                        </div>
+                        
+                        <button id="btn-edit-profile" class="btn" style="width: 100%; margin-top: 20px; padding: 12px; font-size: 13px; border-radius: 8px; font-weight: 600; background: var(--primary-blue-bg); color: var(--primary-blue-light); border: 1px solid rgba(37, 99, 235, 0.2); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02); cursor: pointer;">
+                            ⚙️ 契約条件の変更
+                        </button>
+                    </div>
+
+                    <!-- 管理者代理打刻セクション (サイドバー下部へ美しく統合) -->
                     <div style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
                         <h3 style="border: none; font-size: 1.05rem; width: 100%; margin-bottom: 15px;">🕒 管理者代理打刻</h3>
                         <div style="display: flex; flex-direction: column; gap: 10px;">
