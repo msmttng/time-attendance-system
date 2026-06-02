@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理画面 - スマート打刻システム</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>管理ダッシュボード - スマート打刻システム</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
         .admin-section {
@@ -108,34 +108,128 @@
         .modal h3 {
             margin-top: 0; margin-bottom: 15px;
         }
+
+        /* ダッシュボード用カードスタイル */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            text-align: left;
+        }
+        .card-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+        .card-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+        
+        /* カスタムヘッダー */
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
     </style>
 </head>
 <body>
     <div class="background-animation"></div>
-    <div class="container glass-panel" style="max-width: 900px; padding: 30px;">
-        <header>
-            <h1>⚙️ システム管理画面</h1>
-            <p class="subtitle">設定・従業員・打刻履歴の管理</p>
-        </header>
+    <div class="container glass-panel" style="max-width: 950px; padding: 30px; width: 95%;">
+        
+        <div class="admin-header">
+            <div>
+                <h1 style="font-size: 24px; font-weight: 700; color: var(--text-primary); margin-bottom: 5px;">⚙️ 管理ダッシュボード</h1>
+                <p class="subtitle" style="text-align: left; margin: 0;">集計・打刻・システム設定の総合管理</p>
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <label style="font-size: 14px; font-weight: bold; color: var(--text-secondary);">対象月:</label>
+                <select id="month-select" class="custom-select" style="padding: 8px 15px; font-size: 14px; width: 140px; border: 2px solid #e2e8f0; border-radius: 8px; background: rgba(255,255,255,0.8);">
+                    <!-- JavaScriptで動的に生成 -->
+                </select>
+            </div>
+        </div>
 
         <!-- メインコンテンツ (認証後に表示) -->
         <main id="admin-content" class="hidden">
             
-            <!-- システム設定セクション -->
+            <!-- 月次集計サマリーセクション -->
             <div class="admin-section">
-                <h3>システム設定</h3>
-                <div class="form-group">
-                    <label>管理者パスワード</label>
-                    <input type="text" id="setting-password" class="custom-select" style="margin-bottom: 15px;">
-                    <label>月次レポート送信先メールアドレス</label>
-                    <input type="email" id="setting-email" class="custom-select" style="margin-bottom: 15px;">
+                <h3>📊 月次集計サマリー</h3>
+                <div class="summary-cards" id="summary-cards">
+                    <div class="card">
+                        <div class="card-title">今月の所定営業時間</div>
+                        <div class="card-value" id="standard-hours">--時間--分</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">全従業員 実労働時間</div>
+                        <div class="card-value" id="total-hours">--時間--分</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">稼働人数</div>
+                        <div class="card-value" id="total-users">--人</div>
+                    </div>
                 </div>
-                <button id="btn-save-settings" class="btn btn-primary" style="padding: 10px 20px; font-size: 14px;">設定を保存</button>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ユーザー名</th>
+                                <th>出勤日数</th>
+                                <th>実労働時間</th>
+                                <th>残業時間</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aggregation-tbody">
+                            <tr>
+                                <td colspan="4" style="text-align: center;">データを読み込んでいます...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 打刻履歴管理セクション -->
+            <div class="admin-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="margin-bottom: 0;">🕒 打刻履歴の管理</h3>
+                    <button id="btn-open-add-log" class="btn btn-success" style="padding: 8px 15px; font-size: 14px; height: auto;">＋ 手動追加</button>
+                </div>
+
+                <div class="table-container">
+                    <table style="font-size: 14px;">
+                        <thead>
+                            <tr>
+                                <th>打刻日時</th>
+                                <th>氏名</th>
+                                <th>種類</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-tbody">
+                            <tr><td colspan="4" style="text-align: center;">データを読み込んでいます...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- 従業員管理セクション -->
             <div class="admin-section">
-                <h3>従業員管理</h3>
+                <h3>👥 従業員管理</h3>
                 <div class="form-row">
                     <div>
                         <label style="font-size: 0.85rem; color: var(--text-secondary);">ユーザーID (半角英数)</label>
@@ -153,7 +247,7 @@
                 </div>
 
                 <div class="table-container">
-                    <table>
+                    <table style="font-size: 14px;">
                         <thead>
                             <tr>
                                 <th>ユーザーID</th>
@@ -167,31 +261,16 @@
                 </div>
             </div>
 
-            <!-- 打刻履歴管理セクション -->
+            <!-- システム設定セクション -->
             <div class="admin-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin-bottom: 0;">打刻履歴の管理</h3>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="month" id="log-month-select" class="custom-select" style="padding: 8px; font-size: 14px; border: 2px solid #e2e8f0; border-radius: 6px;">
-                        <button id="btn-open-add-log" class="btn btn-success" style="padding: 8px 15px; font-size: 14px; height: auto;">＋ 手動追加</button>
-                    </div>
+                <h3>🔧 システム設定</h3>
+                <div class="form-group">
+                    <label>管理者パスワード</label>
+                    <input type="text" id="setting-password" class="custom-select" style="margin-bottom: 15px;">
+                    <label>月次レポート送信先メールアドレス</label>
+                    <input type="email" id="setting-email" class="custom-select" style="margin-bottom: 15px;">
                 </div>
-
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>打刻日時 (サーバー)</th>
-                                <th>氏名</th>
-                                <th>打刻種類</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="log-tbody">
-                            <tr><td colspan="4" style="text-align: center;">データを読み込んでいます...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+                <button id="btn-save-settings" class="btn btn-primary" style="padding: 10px 20px; font-size: 14px;">設定を保存</button>
             </div>
             
         </main>
@@ -199,7 +278,6 @@
         <footer>
             <div class="footer-links" style="margin-top: 20px;">
                 <a href="index.html" class="link-btn" style="display: inline-block; margin-bottom: 10px;">🔙 打刻画面へ戻る</a>
-                <a href="dashboard.html" class="link-btn" style="display: inline-block; margin-left: 10px;">📊 ダッシュボード</a>
             </div>
         </footer>
     </div>
@@ -208,7 +286,7 @@
     <div id="password-overlay" class="overlay">
         <div class="glass-panel" style="padding: 30px; border-radius: 16px; text-align: center; max-width: 350px; width: 90%;">
             <h2 style="margin-bottom: 20px; font-size: 20px;">🔒 認証が必要です</h2>
-            <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">管理パスワードを入力してください</p>
+            <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">管理用パスワードを入力してください</p>
             <input type="password" id="admin-password" placeholder="パスワード" class="custom-select" style="margin-bottom: 15px; text-align: center;">
             <button id="btn-login" class="btn btn-primary" style="width: 100%;">ログイン</button>
             <p id="password-error" style="color: var(--accent-red); font-size: 12px; margin-top: 10px; min-height: 15px;"></p>
