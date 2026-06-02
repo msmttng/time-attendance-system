@@ -944,3 +944,217 @@ async function sendPostRequest(payload, successMsg) {
         overlay.classList.add('hidden');
     }
 }
+
+// === 勤務表（Excel）フォーマット出力機能 ===
+async function exportToFormattedExcel() {
+    const userId = currentSelectedUserId;
+    const user = currentUsers[userId];
+    if (!user) return;
+
+    if (typeof ExcelJS === 'undefined') {
+        alert('Excel出力ライブラリが読み込まれていません。ページを再読み込みしてください。');
+        return;
+    }
+
+    const monthStr = document.getElementById('month-select').value;
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('勤務表');
+
+    // 列幅の設定
+    worksheet.columns = [
+        { width: 14 }, // A: 日付
+        { width: 12 }, // B: 開始時刻
+        { width: 12 }, // C: 所定時刻
+        { width: 12 }, // D: 終了時刻
+        { width: 12 }, // E: 休憩時間
+        { width: 10 }, // F: 勤務
+        { width: 30 }, // G: 作業内容
+        { width: 12 }, // H: 実働
+        { width: 12 }, // I: 時間外
+        { width: 25 }  // J: 特記事項
+    ];
+
+    // フォント設定
+    worksheet.eachRow((row) => {
+        row.font = { name: 'Meiryo UI', size: 11 };
+    });
+
+    // タイトル
+    worksheet.mergeCells('D3:G4');
+    const titleCell = worksheet.getCell('D3');
+    titleCell.value = '勤 務 表';
+    titleCell.font = { name: 'Meiryo UI', size: 20, bold: true, underline: true };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // ハンコ枠
+    worksheet.mergeCells('I3:I4');
+    const stamp1 = worksheet.getCell('I3');
+    stamp1.value = '作業者印';
+    stamp1.alignment = { vertical: 'top', horizontal: 'center' };
+    stamp1.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+
+    worksheet.mergeCells('J3:J4');
+    const stamp2 = worksheet.getCell('J3');
+    stamp2.value = '責任者印';
+    stamp2.alignment = { vertical: 'top', horizontal: 'center' };
+    stamp2.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+
+    // 対象月
+    worksheet.getCell('A8').value = monthStr.replace('-', '/');
+    worksheet.getCell('A8').font = { color: { argb: 'FFFF0000' } }; // 赤文字
+
+    // サマリーヘッダー (緑背景)
+    const summaryHeaderBg = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B050' } }; 
+    worksheet.mergeCells('A9:B9');
+    worksheet.getCell('A9').value = '会社名';
+    worksheet.mergeCells('C9:D9');
+    worksheet.getCell('C9').value = '名前';
+    worksheet.getCell('E9').value = '標準開始時間';
+    worksheet.getCell('F9').value = '標準終了時間';
+    worksheet.getCell('G9').value = '所定時間';
+    worksheet.getCell('H9').value = '稼働日数';
+    worksheet.mergeCells('I9:J9');
+    worksheet.getCell('I9').value = '時間外';
+
+    ['A9','C9','E9','F9','G9','H9','I9'].forEach(cell => {
+        const c = worksheet.getCell(cell);
+        c.fill = summaryHeaderBg;
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
+        c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    });
+
+    // サマリー値
+    worksheet.mergeCells('A10:B10');
+    worksheet.getCell('A10').value = ''; // 会社名
+    worksheet.mergeCells('C10:D10');
+    worksheet.getCell('C10').value = user.name;
+    worksheet.getCell('E10').value = user.startTime || '13:00';
+    worksheet.getCell('F10').value = user.endTime || '19:00';
+    worksheet.getCell('G10').value = user.standardHours || '120';
+    
+    worksheet.getCell('H10').value = document.getElementById('indiv-work-days').textContent.replace('日', '');
+    worksheet.mergeCells('I10:J10');
+    worksheet.getCell('I10').value = document.getElementById('indiv-overtime').textContent;
+
+    ['A10','C10','E10','F10','G10','H10','I10'].forEach(cell => {
+        const c = worksheet.getCell(cell);
+        c.alignment = { vertical: 'middle', horizontal: 'center' };
+        c.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    });
+
+    // 明細ヘッダー (緑背景)
+    const headers = ['日付', '開始時刻', '所定時刻', '終了時刻', '休憩時間', '勤務', '作業内容', '実働', '時間外', '特記事項'];
+    const row12 = worksheet.getRow(12);
+    headers.forEach((h, i) => {
+        const cell = row12.getCell(i + 1);
+        cell.value = h;
+        cell.fill = summaryHeaderBg;
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    });
+
+    // 実働・時間外のフォーマット変換関数 ("6時間13分" => "06:13")
+    const formatHm = (str) => {
+        if (!str || str === '-') return '';
+        const match = str.match(/(\d+)時間\s*(\d+)分/);
+        if (match) return `${String(match[1]).padStart(2,'0')}:${String(match[2]).padStart(2,'0')}`;
+        return str;
+    };
+
+    // 明細データ
+    const tableRows = document.querySelectorAll('#indiv-calendar-tbody tr');
+    let startRow = 13;
+    tableRows.forEach((row) => {
+        const cols = row.querySelectorAll('td');
+        if (cols.length >= 11) {
+            const type = cols[1].textContent.trim();
+            const dateStr = cols[2].textContent.trim();
+            const start = cols[3].textContent.trim();
+            const standardEnd = cols[4].textContent.trim();
+            const end = cols[5].textContent.trim();
+            const rest = cols[6].textContent.trim().replace('分','');
+            const net = cols[7].textContent.trim();
+            const over = cols[8].textContent.trim();
+            const report = cols[10].textContent.trim();
+
+            const dataRow = worksheet.getRow(startRow);
+            
+            // Excel上でシリアル値にならないようにするため文字列として入力
+            dataRow.getCell(1).value = dateStr; 
+            dataRow.getCell(2).value = start !== '-' ? start : '';
+            dataRow.getCell(3).value = standardEnd !== '-' ? standardEnd : '';
+            dataRow.getCell(4).value = end !== '-' ? end : '';
+            
+            let restFmt = '';
+            if (rest && rest !== '-') {
+                let restMins = parseInt(rest, 10);
+                if (!isNaN(restMins)) {
+                    let h = Math.floor(restMins / 60);
+                    let m = restMins % 60;
+                    restFmt = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                } else {
+                    restFmt = rest;
+                }
+            }
+            dataRow.getCell(5).value = restFmt;
+            
+            dataRow.getCell(6).value = type !== '-' ? type : '';
+            dataRow.getCell(7).value = report !== '-' ? report : '';
+            dataRow.getCell(8).value = formatHm(net);
+            dataRow.getCell(9).value = formatHm(over);
+            dataRow.getCell(10).value = '';
+
+            for (let i = 1; i <= 10; i++) {
+                dataRow.getCell(i).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                dataRow.getCell(i).alignment = { vertical: 'middle', horizontal: (i>=2 && i<=5) || i>=8 ? 'center' : 'left' };
+            }
+            startRow++;
+        }
+    });
+
+    // 余白（空行）を10行ほど追加
+    for (let i = 0; i < 10; i++) {
+        const dataRow = worksheet.getRow(startRow);
+        for (let j = 1; j <= 10; j++) {
+            dataRow.getCell(j).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        }
+        startRow++;
+    }
+
+    // 合計欄
+    worksheet.mergeCells(`A${startRow}:I${startRow}`);
+    const totalLabel = worksheet.getCell(`A${startRow}`);
+    totalLabel.value = '合計';
+    totalLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+    
+    const indivTotal = document.getElementById('indiv-total-hours').textContent;
+    worksheet.getCell(`J${startRow}`).value = formatHm(indivTotal);
+    worksheet.getCell(`J${startRow}`).alignment = { horizontal: 'center' };
+
+    for (let j = 1; j <= 10; j++) {
+        worksheet.getRow(startRow).getCell(j).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    }
+
+    // 備考欄
+    startRow++;
+    worksheet.mergeCells(`A${startRow}:B${startRow+3}`);
+    worksheet.getCell(`A${startRow}`).value = '備考';
+    worksheet.getCell(`A${startRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
+    
+    worksheet.mergeCells(`C${startRow}:J${startRow+3}`);
+    worksheet.getCell(`C${startRow}`).value = '※残業時間は所定時刻を終わりの時間として計算しています。';
+    worksheet.getCell(`C${startRow}`).alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+
+    for (let j = 1; j <= 10; j++) {
+        // 簡易的に全セルにBorderを設定
+        worksheet.getRow(startRow).getCell(j).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        worksheet.getRow(startRow+1).getCell(j).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        worksheet.getRow(startRow+2).getCell(j).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        worksheet.getRow(startRow+3).getCell(j).border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    }
+
+    // Generate Excel File
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `勤務表_${user.name}_${monthStr}.xlsx`);
+}

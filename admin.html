@@ -6,6 +6,9 @@
     <title>管理ダッシュボード - スマート打刻システム</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- ExcelJS & FileSaver for Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
         <style>
         :root {
             --primary-blue: #1e40af;          /* 落ち着いたディープブルー (法人・医療向け) */
@@ -447,7 +450,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0px; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; gap: 10px;">
                             <button id="btn-export-csv" class="btn" style="padding: 10px 18px; font-size: 13px; font-weight: 600; background: var(--primary-blue-light); color: white; border: none; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2); cursor: pointer;"><span style="margin-right: 6px;">📥</span>CSVで出力</button>
-                            <button onclick="alert('Excel出力はCSV形式でのダウンロードが推奨されています。CSV出力をご利用ください。')" class="btn" style="padding: 10px 18px; font-size: 13px; font-weight: 600; background: var(--primary-blue); color: white; border: none; box-shadow: 0 4px 10px rgba(30, 58, 138, 0.2); cursor: pointer;"><span style="margin-right: 6px;">📊</span>EXCELで出力</button>
+                            <button onclick="exportToFormattedExcel()" class="btn" style="padding: 10px 18px; font-size: 13px; font-weight: 600; background: var(--primary-blue); color: white; border: none; box-shadow: 0 4px 10px rgba(30, 58, 138, 0.2); cursor: pointer;"><span style="margin-right: 6px;">📊</span>EXCELで出力</button>
                         </div>
                     </div>
                     
