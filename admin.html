@@ -33,13 +33,14 @@
             flex: 1;
             min-width: 150px;
         }
-        .form-row input {
+        .form-row input, .form-row select {
             width: 100%;
             padding: 10px 15px;
             border: 2px solid #e2e8f0;
             border-radius: 8px;
             font-size: 14px;
             box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.8);
         }
         .table-container {
             overflow-x: auto;
@@ -79,14 +80,42 @@
             cursor: pointer;
         }
         .btn-danger:hover { background: #dc2626; }
+        .btn-success {
+            background: #10b981;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-success:hover { background: #059669; }
+        
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        .modal h3 {
+            margin-top: 0; margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
     <div class="background-animation"></div>
-    <div class="container glass-panel" style="max-width: 800px; padding: 30px;">
+    <div class="container glass-panel" style="max-width: 900px; padding: 30px;">
         <header>
             <h1>⚙️ システム管理画面</h1>
-            <p class="subtitle">従業員設定とシステム設定</p>
+            <p class="subtitle">設定・従業員・打刻履歴の管理</p>
         </header>
 
         <!-- メインコンテンツ (認証後に表示) -->
@@ -107,7 +136,6 @@
             <!-- 従業員管理セクション -->
             <div class="admin-section">
                 <h3>従業員管理</h3>
-                
                 <div class="form-row">
                     <div>
                         <label style="font-size: 0.85rem; color: var(--text-secondary);">ユーザーID (半角英数)</label>
@@ -134,8 +162,33 @@
                                 <th>操作</th>
                             </tr>
                         </thead>
-                        <tbody id="user-tbody">
-                            <!-- JSで生成 -->
+                        <tbody id="user-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 打刻履歴管理セクション -->
+            <div class="admin-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 0;">打刻履歴の管理</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="month" id="log-month-select" class="custom-select" style="padding: 8px; font-size: 14px; border: 2px solid #e2e8f0; border-radius: 6px;">
+                        <button id="btn-open-add-log" class="btn btn-success" style="padding: 8px 15px; font-size: 14px; height: auto;">＋ 手動追加</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>打刻日時 (サーバー)</th>
+                                <th>氏名</th>
+                                <th>打刻種類</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="log-tbody">
+                            <tr><td colspan="4" style="text-align: center;">データを読み込んでいます...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -159,6 +212,57 @@
             <input type="password" id="admin-password" placeholder="パスワード" class="custom-select" style="margin-bottom: 15px; text-align: center;">
             <button id="btn-login" class="btn btn-primary" style="width: 100%;">ログイン</button>
             <p id="password-error" style="color: var(--accent-red); font-size: 12px; margin-top: 10px; min-height: 15px;"></p>
+        </div>
+    </div>
+
+    <!-- 打刻修正モーダル -->
+    <div id="edit-log-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>打刻の修正</h3>
+            <input type="hidden" id="edit-log-row">
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻日時</label>
+                <input type="datetime-local" id="edit-log-time" class="custom-select" style="width: 100%; padding: 10px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻種類</label>
+                <select id="edit-log-type" class="custom-select" style="width: 100%; padding: 10px;">
+                    <option value="出勤">出勤</option>
+                    <option value="退勤">退勤</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-save-log-edit" class="btn btn-primary" style="flex: 1; padding: 10px;">保存</button>
+                <button onclick="document.getElementById('edit-log-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #333;">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 打刻手動追加モーダル -->
+    <div id="add-log-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>打刻の手動追加</h3>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">ユーザー</label>
+                <select id="add-log-user" class="custom-select" style="width: 100%; padding: 10px;">
+                    <!-- JSで生成 -->
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻日時</label>
+                <input type="datetime-local" id="add-log-time" class="custom-select" style="width: 100%; padding: 10px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻種類</label>
+                <select id="add-log-type" class="custom-select" style="width: 100%; padding: 10px;">
+                    <option value="出勤">出勤</option>
+                    <option value="退勤">退勤</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-save-new-log" class="btn btn-success" style="flex: 1; padding: 10px;">追加</button>
+                <button onclick="document.getElementById('add-log-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #333;">キャンセル</button>
+            </div>
         </div>
     </div>
 
