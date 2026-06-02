@@ -192,7 +192,7 @@ function updateUserViewSelector(users) {
     const lastValue = select.value;
     
     // 初期状態にリセット
-    select.innerHTML = '<option value="all">📊 全体ダッシュボード</option>';
+    select.innerHTML = '<option value="all">📊 ダッシュボード</option>';
     
     for (const [id, user] of Object.entries(users)) {
         const option = document.createElement('option');
