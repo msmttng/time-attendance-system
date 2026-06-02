@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スマート打刻システム</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="container glass-panel">
+        <header>
+            <h1>Time Attendance</h1>
+            <p class="subtitle">スマート打刻システム</p>
+        </header>
+
+        <main>
+            <div class="clock-display">
+                <div id="date-display" class="date-text">--月--日 (--)</div>
+                <div id="time-display" class="time-text">--:--:--</div>
+            </div>
+
+            <div class="form-group">
+                <label for="user-select">ユーザーを選択</label>
+                <div class="custom-select-wrapper">
+                    <select id="user-select" class="custom-select">
+                        <option value="" disabled selected>選択してください</option>
+                        <!-- config.jsから動的に生成されます -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="btn-clock-in" class="btn btn-primary" onclick="submitAttendance('in')">
+                    <span class="icon">💼</span> 出勤
+                </button>
+                <button id="btn-clock-out" class="btn btn-secondary" onclick="submitAttendance('out')">
+                    <span class="icon">🏠</span> 退勤
+                </button>
+            </div>
+
+            <div id="status-message" class="status-message hidden">
+                <!-- Status messages will be injected here -->
+            </div>
+        </main>
+        
+        <footer>
+            <p>&copy; 2026 Smart Attendance. All rights reserved.</p>
+            <p style="margin-top: 10px;"><a href="dashboard.html" style="color: var(--accent-blue); text-decoration: none; font-size: 14px;">📊 集計ダッシュボードを見る</a></p>
+        </footer>
+    </div>
+    
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="overlay hidden">
+        <div class="spinner"></div>
+        <p>送信中...</p>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

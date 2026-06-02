@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>集計ダッシュボード - スマート打刻システム</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .dashboard-container {
+            max-width: 800px;
+            width: 95%;
+            padding: 30px;
+        }
+        
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.5);
+            color: var(--text-primary);
+            border: 1px solid var(--glass-border);
+            text-decoration: none;
+        }
+        
+        .btn-small:hover {
+            background: rgba(255, 255, 255, 0.8);
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            color: var(--text-primary);
+        }
+        
+        th {
+            background: rgba(0, 0, 0, 0.03);
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            text-align: left;
+        }
+        
+        .card-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+        
+        .card-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="container glass-panel dashboard-container">
+        <div class="header-actions">
+            <a href="index.html" class="btn btn-small">← 打刻画面へ戻る</a>
+            <div class="custom-select-wrapper" style="width: 200px;">
+                <select id="month-select" class="custom-select" style="padding: 8px 15px; font-size: 14px;">
+                    <!-- JavaScriptで動的に生成 -->
+                </select>
+            </div>
+        </div>
+
+        <header>
+            <h1>月次集計ダッシュボード</h1>
+            <p id="dashboard-subtitle" class="subtitle">2026年6月度 労働時間サマリー</p>
+        </header>
+
+        <main>
+            <!-- 統計カード -->
+            <div class="summary-cards" id="summary-cards">
+                <div class="card">
+                    <div class="card-title">今月の所定営業時間</div>
+                    <div class="card-value" id="standard-hours">--時間--分</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">全従業員 実労働時間</div>
+                    <div class="card-value" id="total-hours">--時間--分</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">稼働人数</div>
+                    <div class="card-value" id="total-users">--人</div>
+                </div>
+            </div>
+
+            <!-- 集計テーブル -->
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ユーザー名</th>
+                            <th>出勤日数</th>
+                            <th>実労働時間</th>
+                            <th>残業時間</th>
+                        </tr>
+                    </thead>
+                    <tbody id="aggregation-tbody">
+                        <tr>
+                            <td colspan="4" style="text-align: center;">データを読み込んでいます...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="status-message" class="status-message hidden"></div>
+        </main>
+        
+        <footer>
+            <p>&copy; 2026 Smart Attendance. All rights reserved.</p>
+        </footer>
+    </div>
+    
+    <!-- Password overlay -->
+    <div id="password-overlay" class="overlay">
+        <div class="glass-panel" style="padding: 30px; border-radius: 16px; text-align: center; max-width: 350px; width: 90%;">
+            <h2 style="margin-bottom: 20px; font-size: 20px;">🔒 認証</h2>
+            <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">ダッシュボードを閲覧するには<br>パスワードを入力してください。</p>
+            <input type="password" id="dashboard-password" class="custom-select" style="margin-bottom: 15px; text-align: center;" placeholder="パスワード">
+            <button id="btn-login" class="btn btn-primary" style="width: 100%;">ログイン</button>
+            <p id="password-error" style="color: var(--accent-red); font-size: 12px; margin-top: 10px; min-height: 15px;"></p>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay" class="overlay hidden">
+        <div class="spinner"></div>
+        <p>データ取得中...</p>
+    </div>
+
+    <!-- script.jsからGAS_WEB_APP_URLを読み込む -->
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>
