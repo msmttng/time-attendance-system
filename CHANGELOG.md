@@ -2,6 +2,10 @@
 
 All notable changes to the Time Attendance System will be documented in this file.
 
+## [1.2.4] - 2026-06-02
+### Fixed
+- **管理画面におけるモーダル無防備露出バグの完全修正**: `admin.html` において CSS 末尾の構文エラー（重複箇所と `</style>}` によるスタイル破壊）、および基礎スタイルシートである `style.css` のロード欠落が重なり、`.hidden` クラス（`display: none !important;`）が機能せず、「日別勤務データの編集」モーダルがロード時にいきなり全画面表示されて操作不能になっていた致命的なビジュアルバグを完全解消。
+
 ## [1.2.3] - 2026-06-02
 ### Fixed
 - **管理ダッシュボードのログイン不能バグの修正**: `admin.html` で `script.js` をロードした際、打刻画面用の要素（`date-display`, `time-display`, `user-select`）が存在しないことによって JavaScript がクラッシュし、後続の `admin.js`（ログイン処理等）の読み込みが停止していた不具合を、要素有無のガード節（`if (!el) return;`）を追加することで完全に解消。
