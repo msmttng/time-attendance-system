@@ -20,8 +20,10 @@ function updateClock() {
     const seconds = String(now.getSeconds()).padStart(2, '0');
     const timeStr = `${hours}:${minutes}:${seconds}`;
     
-    document.getElementById('date-display').textContent = dateStr;
-    document.getElementById('time-display').textContent = timeStr;
+    const dateEl = document.getElementById('date-display');
+    const timeEl = document.getElementById('time-display');
+    if (dateEl) dateEl.textContent = dateStr;
+    if (timeEl) timeEl.textContent = timeStr;
 }
 
 // 1秒ごとに時計を更新
@@ -35,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // GASから従業員リストを取得してプルダウンを生成
 async function initUserSelect() {
     const select = document.getElementById('user-select');
+    if (!select) return; // 管理画面等で要素がない場合は何もしない
     
     if (GAS_WEB_APP_URL.includes('YOUR_SCRIPT_ID_HERE')) {
         // デモ用データ

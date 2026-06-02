@@ -2,6 +2,10 @@
 
 All notable changes to the Time Attendance System will be documented in this file.
 
+## [1.2.3] - 2026-06-02
+### Fixed
+- **管理ダッシュボードのログイン不能バグの修正**: `admin.html` で `script.js` をロードした際、打刻画面用の要素（`date-display`, `time-display`, `user-select`）が存在しないことによって JavaScript がクラッシュし、後続の `admin.js`（ログイン処理等）の読み込みが停止していた不具合を、要素有無のガード節（`if (!el) return;`）を追加することで完全に解消。
+
 ## [1.2.2] - 2026-06-02
 ### Fixed
 - **HTML構造の破綻と二重化の完全修復**: 個別ビュー（`#individual-view`）内で発生していたHTMLタグの破損・二重化（CSV出力、代理打刻ボタン、サマリーカードなどの多重記述）を完全に排除し、正しい左右2カラムのプレミアムグリッド構成に修復。
