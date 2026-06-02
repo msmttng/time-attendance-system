@@ -70,6 +70,8 @@
         
         /* ボタン基本 */
         .btn {
+            flex: none;
+            width: auto;
             padding: 10px 20px;
             font-size: 14px;
             border-radius: 8px;
@@ -256,7 +258,7 @@
                 <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.5); padding: 10px 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
                     <label style="font-size: 14px; font-weight: bold; color: var(--text-primary); white-space: nowrap;">表示対象:</label>
                     <select id="user-view-select" style="padding: 8px 15px; font-size: 14px; width: 180px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; outline: none;">
-                        <option value="all">📊 全体ダッシュボード</option>
+                        <option value="all">📊 ダッシュボード</option>
                         <!-- JavaScriptで動的に生成 -->
                     </select>
                 </div>
