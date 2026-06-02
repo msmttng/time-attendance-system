@@ -217,6 +217,55 @@ function doPost(e) {
       if (!found) {
         sheet.appendRow([new Date(date), userId, type || '', status || '', report || '']);
       }
+      // --- 出勤・退勤時刻の修正処理 ---
+      if (payload.inTime !== undefined || payload.outTime !== undefined) {
+        const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+        if (logSheet) {
+          const logData = logSheet.getDataRange().getValues();
+          let inRowIndex = -1;
+          let outRowIndex = -1;
+          
+          for (let j = 1; j < logData.length; j++) {
+            const logDateStr = logData[j][0] instanceof Date ? Utilities.formatDate(logData[j][0], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(logData[j][0]).substring(0,10);
+            if (logDateStr === date && String(logData[j][1]) === String(userId)) {
+              if (logData[j][3] === '出勤') inRowIndex = j + 1;
+              if (logData[j][3] === '退勤') outRowIndex = j + 1;
+            }
+          }
+          
+          if (payload.inTime !== undefined) {
+            if (payload.inTime === '') {
+              // 空の場合は削除（セルを空にする）
+              if (inRowIndex !== -1) {
+                logSheet.getRange(inRowIndex, 1, 1, 5).clearContent();
+              }
+            } else {
+              const newInDate = new Date(`${date}T${payload.inTime}:00+09:00`);
+              if (inRowIndex !== -1) {
+                logSheet.getRange(inRowIndex, 1).setValue(newInDate);
+              } else {
+                logSheet.appendRow([newInDate, userId, payload.userName || '', '出勤', '管理者修正']);
+              }
+            }
+          }
+          
+          if (payload.outTime !== undefined) {
+            if (payload.outTime === '') {
+              if (outRowIndex !== -1) {
+                logSheet.getRange(outRowIndex, 1, 1, 5).clearContent();
+              }
+            } else {
+              const newOutDate = new Date(`${date}T${payload.outTime}:00+09:00`);
+              if (outRowIndex !== -1) {
+                logSheet.getRange(outRowIndex, 1).setValue(newOutDate);
+              } else {
+                logSheet.appendRow([newOutDate, userId, payload.userName || '', '退勤', '管理者修正']);
+              }
+            }
+          }
+        }
+      }
+
       return createSuccessResponse('日別勤務データを更新しました。');
     }
 

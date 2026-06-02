@@ -476,7 +476,7 @@ function renderIndividualView(userId) {
 
         html += `
             <tr ${rowClass}>
-                <td><button class="btn-small btn-primary" onclick="openEditDailyModal('${dateKey}', '${userId}', '${typeVal}', '${dailyState.status || ''}', '${dailyState.report || ''}')">編集</button></td>
+                <td><button class="btn-small btn-primary" onclick="openEditDailyModal('${dateKey}', '${userId}', '${typeVal}', '${dailyState.status || ''}', '${dailyState.report || ''}', '${inStr !== '-' ? inStr : ''}', '${outStr !== '-' ? outStr : ''}')">編集</button></td>
                 <td><span style="font-weight: 500;">${typeVal || '-'}</span></td>
                 <td><span style="${dateColorStyle}">${shortDateStr}</span></td>
                 <td>${inStr}</td>
@@ -625,12 +625,14 @@ async function updateDailyStatus(date, userId, status) {
     }
 }
 
-function openEditDailyModal(date, userId, type, status, report) {
+function openEditDailyModal(date, userId, type, status, report, inTime, outTime) {
     document.getElementById('edit-daily-date').value = date;
     document.getElementById('edit-daily-date-label').value = date;
     document.getElementById('edit-daily-type').value = type;
     document.getElementById('edit-daily-status').value = status;
     document.getElementById('edit-daily-report').value = report || '';
+    document.getElementById('edit-daily-in').value = inTime || '';
+    document.getElementById('edit-daily-out').value = outTime || '';
 
     document.getElementById('edit-daily-modal').classList.remove('hidden');
 }
@@ -642,6 +644,9 @@ async function saveDailyEdit() {
     const status = document.getElementById('edit-daily-status').value;
     const report = document.getElementById('edit-daily-report').value.trim();
 
+    const inTime = document.getElementById('edit-daily-in').value;
+    const outTime = document.getElementById('edit-daily-out').value;
+
     const payload = {
         action: 'update_daily_status',
         adminPassword: currentPassword,
@@ -649,7 +654,10 @@ async function saveDailyEdit() {
         userId: userId,
         type: type,
         status: status,
-        report: report
+        report: report,
+        inTime: inTime,
+        outTime: outTime,
+        userName: currentUsers[userId] ? currentUsers[userId].name : ''
     };
 
     const overlay = document.getElementById('loading-overlay');
