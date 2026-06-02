@@ -194,7 +194,7 @@ function renderAggregationDashboard(rawData, employeesSettings = {}) {
         const user = userLogs[userId];
         const breakMinutes = (employeesSettings[userId]) ? employeesSettings[userId].breakMinutes : 0;
         
-        let totalNetMinutes = 0, totalOvertimeMinutes = 0, workDays = 0;
+        let totalNetMinutes = 0, totalGrossMinutes = 0, totalOvertimeMinutes = 0, workDays = 0;
         
         for (const day in user.days) {
             const log = user.days[day];
@@ -207,6 +207,7 @@ function renderAggregationDashboard(rawData, employeesSettings = {}) {
             
             let grossMins = outMins - inMins;
             if (grossMins < 0) grossMins = 0;
+            totalGrossMinutes += grossMins;
             
             let todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes;
             let netMins = grossMins - todayBreak;
@@ -240,6 +241,7 @@ function renderAggregationDashboard(rawData, employeesSettings = {}) {
             <tr>
                 <td><strong>${user.name}</strong><br><span style="font-size: 11px; color: var(--text-secondary);">設定休憩: ${breakMinutes}分</span></td>
                 <td>${workDays} 日</td>
+                <td>${formatTime(totalGrossMinutes)}</td>
                 <td><span style="color:var(--accent-blue);font-weight:bold;">${formatTime(totalNetMinutes)}</span></td>
                 <td>${formatTime(totalOvertimeMinutes)}</td>
             </tr>
