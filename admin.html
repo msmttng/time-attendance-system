@@ -7,6 +7,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
+        /* 管理画面コンテナの左寄せと横幅最大化 */
+        body .container {
+            text-align: left;
+            max-width: 950px;
+            padding: 30px;
+            width: 95%;
+        }
+
         .admin-section {
             background: rgba(255, 255, 255, 0.75);
             border-radius: 16px;
@@ -14,15 +22,32 @@
             margin-bottom: 25px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         }
+        
         .admin-section h3 {
             margin-top: 0;
-            margin-bottom: 15px;
-            font-size: 1.15rem;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: 700;
             color: var(--text-primary);
-            border-bottom: 2px solid var(--accent-blue);
-            padding-bottom: 8px;
+            border-bottom: 3px solid var(--accent-blue);
+            padding-bottom: 6px;
             display: inline-block;
+            white-space: nowrap; /* タイトルの折り返しを防ぐ */
         }
+        
+        /* 管理画面内ボタンのflex上書きとコンパクト化 */
+        .btn {
+            flex: none;
+            width: auto;
+            padding: 10px 20px;
+            font-size: 14px;
+            height: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+        }
+
         .form-row {
             display: flex;
             gap: 15px;
@@ -34,20 +59,31 @@
             flex: 1;
             min-width: 160px;
         }
-        .form-row input, .form-row select {
+        
+        /* 管理画面独自の入力フォーム美化 */
+        .admin-section input[type="text"],
+        .admin-section input[type="email"],
+        .admin-section input[type="number"],
+        .admin-section input[type="password"],
+        .modal input[type="datetime-local"],
+        .modal select {
             width: 100%;
-            padding: 10px 15px;
+            padding: 10px 14px;
             border: 2px solid #e2e8f0;
             border-radius: 8px;
             font-size: 14px;
-            box-sizing: border-box;
             background: rgba(255, 255, 255, 0.9);
-            transition: border-color 0.3s;
-        }
-        .form-row input:focus, .form-row select:focus {
-            border-color: var(--accent-blue);
+            transition: border-color 0.2s, box-shadow 0.2s;
             outline: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
+        .admin-section input:focus,
+        .modal input:focus,
+        .modal select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+        }
+
         .table-container {
             overflow-x: auto;
             background: rgba(255, 255, 255, 0.6);
@@ -161,6 +197,24 @@
             padding-bottom: 15px;
         }
 
+        /* 認証用オーバーレイのインプット美化 */
+        .overlay input[type="password"] {
+            width: 100%;
+            padding: 14px 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            margin-bottom: 20px;
+        }
+        .overlay input[type="password"]:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
         /* スマホ用レスポンシブデザイン */
         @media (max-width: 600px) {
             .admin-header {
@@ -178,8 +232,8 @@
             .form-row > div {
                 min-width: 100%;
             }
-            .form-row button {
-                width: 100%;
+            .btn, .form-row button {
+                width: 100% !important;
                 margin-top: 10px;
             }
             .admin-section {
@@ -313,10 +367,10 @@
                 <h3>🔧 システム設定</h3>
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label style="font-weight: 500; color: var(--text-primary);">管理者パスワード</label>
-                    <input type="text" id="setting-password" class="custom-select" style="margin-bottom: 15px; border-radius: 8px;">
+                    <input type="text" id="setting-password" style="margin-bottom: 15px;">
                     
                     <label style="font-weight: 500; color: var(--text-primary);">月次レポート送信先メールアドレス</label>
-                    <input type="email" id="setting-email" class="custom-select" style="margin-bottom: 15px; border-radius: 8px;">
+                    <input type="email" id="setting-email" style="margin-bottom: 15px;">
                 </div>
                 <button id="btn-save-settings" class="btn btn-primary" style="padding: 12px 25px; font-size: 14px; border-radius: 8px;">設定を保存</button>
             </div>
@@ -336,7 +390,7 @@
             <div style="font-size: 40px; margin-bottom: 15px;">🔒</div>
             <h2 style="margin-bottom: 15px; font-size: 22px; color: var(--text-primary);">認証が必要です</h2>
             <p style="margin-bottom: 25px; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">管理ダッシュボードにアクセスするには<br>パスワードを入力してください</p>
-            <input type="password" id="admin-password" placeholder="パスワードを入力" class="custom-select" style="margin-bottom: 20px; text-align: center; padding: 15px; border-radius: 10px;">
+            <input type="password" id="admin-password" placeholder="パスワードを入力">
             <button id="btn-login" class="btn btn-primary" style="width: 100%; padding: 15px; border-radius: 10px; font-size: 16px;">ログイン</button>
             <p id="password-error" style="color: var(--accent-red); font-size: 13px; margin-top: 15px; min-height: 18px; font-weight: 500;"></p>
         </div>
@@ -349,11 +403,11 @@
             <input type="hidden" id="edit-log-row">
             <div class="form-group" style="margin-bottom: 15px;">
                 <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻日時</label>
-                <input type="datetime-local" id="edit-log-time" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
+                <input type="datetime-local" id="edit-log-time">
             </div>
             <div class="form-group" style="margin-bottom: 25px;">
                 <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻種類</label>
-                <select id="edit-log-type" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
+                <select id="edit-log-type">
                     <option value="出勤">出勤</option>
                     <option value="退勤">退勤</option>
                 </select>
@@ -371,17 +425,17 @@
             <h3 style="border-bottom: 2px solid var(--success-color); padding-bottom: 10px; display: inline-block;">打刻の手動追加</h3>
             <div class="form-group" style="margin-bottom: 15px;">
                 <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">ユーザー</label>
-                <select id="add-log-user" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
+                <select id="add-log-user">
                     <!-- JSで生成 -->
                 </select>
             </div>
             <div class="form-group" style="margin-bottom: 15px;">
                 <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻日時</label>
-                <input type="datetime-local" id="add-log-time" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
+                <input type="datetime-local" id="add-log-time">
             </div>
             <div class="form-group" style="margin-bottom: 25px;">
                 <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻種類</label>
-                <select id="add-log-type" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
+                <select id="add-log-type">
                     <option value="出勤">出勤</option>
                     <option value="退勤">退勤</option>
                 </select>
