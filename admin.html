@@ -8,30 +8,31 @@
     <link rel="stylesheet" href="style.css">
     <style>
         .admin-section {
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.75);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
         }
         .admin-section h3 {
             margin-top: 0;
             margin-bottom: 15px;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             color: var(--text-primary);
             border-bottom: 2px solid var(--accent-blue);
-            padding-bottom: 5px;
+            padding-bottom: 8px;
             display: inline-block;
         }
         .form-row {
             display: flex;
-            gap: 10px;
+            gap: 15px;
             margin-bottom: 15px;
             align-items: flex-end;
             flex-wrap: wrap;
         }
         .form-row > div {
             flex: 1;
-            min-width: 150px;
+            min-width: 160px;
         }
         .form-row input, .form-row select {
             width: 100%;
@@ -40,14 +41,20 @@
             border-radius: 8px;
             font-size: 14px;
             box-sizing: border-box;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.9);
+            transition: border-color 0.3s;
+        }
+        .form-row input:focus, .form-row select:focus {
+            border-color: var(--accent-blue);
+            outline: none;
         }
         .table-container {
             overflow-x: auto;
-            background: rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.6);
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.8);
-            margin-top: 10px;
+            margin-top: 15px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
         }
         table {
             width: 100%;
@@ -55,9 +62,10 @@
             text-align: left;
         }
         th, td {
-            padding: 12px 15px;
+            padding: 14px 15px;
             border-bottom: 1px solid rgba(0, 0, 0, 0.05);
             color: var(--text-primary);
+            white-space: nowrap; /* 表の崩れ（折り返し）を防止 */
         }
         th {
             background: rgba(0, 0, 0, 0.03);
@@ -68,25 +76,28 @@
         tr:last-child td {
             border-bottom: none;
         }
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.4);
+        }
         .btn-small {
             padding: 6px 12px;
             font-size: 0.85rem;
             border-radius: 6px;
+            transition: opacity 0.2s;
         }
+        .btn-small:hover { opacity: 0.8; }
         .btn-danger {
             background: #ef4444;
             color: white;
             border: none;
             cursor: pointer;
         }
-        .btn-danger:hover { background: #dc2626; }
         .btn-success {
             background: #10b981;
             color: white;
             border: none;
             cursor: pointer;
         }
-        .btn-success:hover { background: #059669; }
         
         .modal {
             position: fixed;
@@ -96,17 +107,19 @@
             justify-content: center;
             align-items: center;
             z-index: 1000;
+            backdrop-filter: blur(4px);
         }
         .modal-content {
             background: white;
-            padding: 25px;
-            border-radius: 12px;
+            padding: 30px;
+            border-radius: 16px;
             width: 90%;
             max-width: 400px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
         .modal h3 {
-            margin-top: 0; margin-bottom: 15px;
+            margin-top: 0; margin-bottom: 20px;
+            color: var(--text-primary);
         }
 
         /* ダッシュボード用カードスタイル */
@@ -114,22 +127,24 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
         .card {
-            background: rgba(255, 255, 255, 0.5);
+            background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.5));
             padding: 20px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.8);
             text-align: left;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
         }
         .card-title {
-            font-size: 12px;
+            font-size: 13px;
+            font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
         .card-value {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 700;
             color: var(--accent-blue);
         }
@@ -138,10 +153,38 @@
         .admin-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             gap: 15px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding-bottom: 15px;
+        }
+
+        /* スマホ用レスポンシブデザイン */
+        @media (max-width: 600px) {
+            .admin-header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            .admin-header .subtitle {
+                text-align: center !important;
+            }
+            .form-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .form-row > div {
+                min-width: 100%;
+            }
+            .form-row button {
+                width: 100%;
+                margin-top: 10px;
+            }
+            .admin-section {
+                padding: 15px;
+            }
         }
     </style>
 </head>
@@ -151,13 +194,13 @@
         
         <div class="admin-header">
             <div>
-                <h1 style="font-size: 24px; font-weight: 700; color: var(--text-primary); margin-bottom: 5px;">⚙️ 管理ダッシュボード</h1>
-                <p class="subtitle" style="text-align: left; margin: 0;">集計・打刻・システム設定の総合管理</p>
+                <h1 style="font-size: 26px; font-weight: 700; color: var(--text-primary); margin-bottom: 5px;">⚙️ 管理ダッシュボード</h1>
+                <p class="subtitle" style="text-align: left; margin: 0; color: var(--text-secondary);">集計・打刻・システム設定の総合管理</p>
             </div>
             
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <label style="font-size: 14px; font-weight: bold; color: var(--text-secondary);">対象月:</label>
-                <select id="month-select" class="custom-select" style="padding: 8px 15px; font-size: 14px; width: 140px; border: 2px solid #e2e8f0; border-radius: 8px; background: rgba(255,255,255,0.8);">
+            <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.5); padding: 10px 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);">
+                <label style="font-size: 14px; font-weight: bold; color: var(--text-primary);">対象月:</label>
+                <select id="month-select" class="custom-select" style="padding: 8px 15px; font-size: 14px; width: 140px; border: 2px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer;">
                     <!-- JavaScriptで動的に生成 -->
                 </select>
             </div>
@@ -197,18 +240,19 @@
                         </thead>
                         <tbody id="aggregation-tbody">
                             <tr>
-                                <td colspan="4" style="text-align: center;">データを読み込んでいます...</td>
+                                <td colspan="5" style="text-align: center;">データを読み込んでいます...</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
             </div>
 
             <!-- 打刻履歴管理セクション -->
             <div class="admin-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h3 style="margin-bottom: 0;">🕒 打刻履歴の管理</h3>
-                    <button id="btn-open-add-log" class="btn btn-success" style="padding: 8px 15px; font-size: 14px; height: auto;">＋ 手動追加</button>
+                    <button id="btn-open-add-log" class="btn btn-success" style="padding: 8px 15px; font-size: 14px; height: auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(16,185,129,0.3);">＋ 手動追加</button>
                 </div>
 
                 <div class="table-container">
@@ -226,6 +270,7 @@
                         </tbody>
                     </table>
                 </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
             </div>
 
             <!-- 従業員管理セクション -->
@@ -233,18 +278,18 @@
                 <h3>👥 従業員管理</h3>
                 <div class="form-row">
                     <div>
-                        <label style="font-size: 0.85rem; color: var(--text-secondary);">ユーザーID (半角英数)</label>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">ユーザーID (半角英数)</label>
                         <input type="text" id="new-user-id" placeholder="user001">
                     </div>
                     <div>
-                        <label style="font-size: 0.85rem; color: var(--text-secondary);">氏名</label>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">氏名</label>
                         <input type="text" id="new-user-name" placeholder="山田 太郎">
                     </div>
                     <div>
-                        <label style="font-size: 0.85rem; color: var(--text-secondary);">休憩時間 (分)</label>
+                        <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 5px; display: block;">休憩時間 (分)</label>
                         <input type="number" id="new-user-break" placeholder="60">
                     </div>
-                    <button id="btn-add-user" class="btn btn-primary" style="padding: 10px 20px; height: 42px;">追加 / 更新</button>
+                    <button id="btn-add-user" class="btn btn-primary" style="padding: 10px 20px; height: 42px; border-radius: 8px;">追加 / 更新</button>
                 </div>
 
                 <div class="table-container">
@@ -260,59 +305,62 @@
                         <tbody id="user-tbody"></tbody>
                     </table>
                 </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: right;">※表は横にスクロールできます</p>
             </div>
 
             <!-- システム設定セクション -->
             <div class="admin-section">
                 <h3>🔧 システム設定</h3>
-                <div class="form-group">
-                    <label>管理者パスワード</label>
-                    <input type="text" id="setting-password" class="custom-select" style="margin-bottom: 15px;">
-                    <label>月次レポート送信先メールアドレス</label>
-                    <input type="email" id="setting-email" class="custom-select" style="margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-weight: 500; color: var(--text-primary);">管理者パスワード</label>
+                    <input type="text" id="setting-password" class="custom-select" style="margin-bottom: 15px; border-radius: 8px;">
+                    
+                    <label style="font-weight: 500; color: var(--text-primary);">月次レポート送信先メールアドレス</label>
+                    <input type="email" id="setting-email" class="custom-select" style="margin-bottom: 15px; border-radius: 8px;">
                 </div>
-                <button id="btn-save-settings" class="btn btn-primary" style="padding: 10px 20px; font-size: 14px;">設定を保存</button>
+                <button id="btn-save-settings" class="btn btn-primary" style="padding: 12px 25px; font-size: 14px; border-radius: 8px;">設定を保存</button>
             </div>
             
         </main>
         
-        <footer>
-            <div class="footer-links" style="margin-top: 20px;">
-                <a href="index.html" class="link-btn" style="display: inline-block; margin-bottom: 10px;">🔙 打刻画面へ戻る</a>
+        <footer style="text-align: center; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 20px; margin-top: 30px;">
+            <div class="footer-links">
+                <a href="index.html" class="link-btn" style="display: inline-block; padding: 10px 20px; background: rgba(255,255,255,0.5); border-radius: 8px; text-decoration: none; color: var(--text-primary); font-weight: 500; transition: background 0.2s;">🔙 打刻画面へ戻る</a>
             </div>
         </footer>
     </div>
 
     <!-- 認証用オーバーレイ -->
     <div id="password-overlay" class="overlay">
-        <div class="glass-panel" style="padding: 30px; border-radius: 16px; text-align: center; max-width: 350px; width: 90%;">
-            <h2 style="margin-bottom: 20px; font-size: 20px;">🔒 認証が必要です</h2>
-            <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-secondary);">管理用パスワードを入力してください</p>
-            <input type="password" id="admin-password" placeholder="パスワード" class="custom-select" style="margin-bottom: 15px; text-align: center;">
-            <button id="btn-login" class="btn btn-primary" style="width: 100%;">ログイン</button>
-            <p id="password-error" style="color: var(--accent-red); font-size: 12px; margin-top: 10px; min-height: 15px;"></p>
+        <div class="glass-panel" style="padding: 40px; border-radius: 20px; text-align: center; max-width: 380px; width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+            <div style="font-size: 40px; margin-bottom: 15px;">🔒</div>
+            <h2 style="margin-bottom: 15px; font-size: 22px; color: var(--text-primary);">認証が必要です</h2>
+            <p style="margin-bottom: 25px; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">管理ダッシュボードにアクセスするには<br>パスワードを入力してください</p>
+            <input type="password" id="admin-password" placeholder="パスワードを入力" class="custom-select" style="margin-bottom: 20px; text-align: center; padding: 15px; border-radius: 10px;">
+            <button id="btn-login" class="btn btn-primary" style="width: 100%; padding: 15px; border-radius: 10px; font-size: 16px;">ログイン</button>
+            <p id="password-error" style="color: var(--accent-red); font-size: 13px; margin-top: 15px; min-height: 18px; font-weight: 500;"></p>
         </div>
     </div>
 
     <!-- 打刻修正モーダル -->
     <div id="edit-log-modal" class="modal hidden">
         <div class="modal-content">
-            <h3>打刻の修正</h3>
+            <h3 style="border-bottom: 2px solid var(--accent-blue); padding-bottom: 10px; display: inline-block;">打刻の修正</h3>
             <input type="hidden" id="edit-log-row">
             <div class="form-group" style="margin-bottom: 15px;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻日時</label>
-                <input type="datetime-local" id="edit-log-time" class="custom-select" style="width: 100%; padding: 10px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻日時</label>
+                <input type="datetime-local" id="edit-log-time" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
             </div>
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻種類</label>
-                <select id="edit-log-type" class="custom-select" style="width: 100%; padding: 10px;">
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻種類</label>
+                <select id="edit-log-type" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
                     <option value="出勤">出勤</option>
                     <option value="退勤">退勤</option>
                 </select>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <button id="btn-save-log-edit" class="btn btn-primary" style="flex: 1; padding: 10px;">保存</button>
-                <button onclick="document.getElementById('edit-log-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #333;">キャンセル</button>
+            <div style="display: flex; gap: 15px;">
+                <button id="btn-save-log-edit" class="btn btn-primary" style="flex: 1; padding: 12px; border-radius: 8px;">保存</button>
+                <button onclick="document.getElementById('edit-log-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #475569; border-radius: 8px; font-size: 16px;">キャンセル</button>
             </div>
         </div>
     </div>
@@ -320,27 +368,27 @@
     <!-- 打刻手動追加モーダル -->
     <div id="add-log-modal" class="modal hidden">
         <div class="modal-content">
-            <h3>打刻の手動追加</h3>
+            <h3 style="border-bottom: 2px solid var(--success-color); padding-bottom: 10px; display: inline-block;">打刻の手動追加</h3>
             <div class="form-group" style="margin-bottom: 15px;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary);">ユーザー</label>
-                <select id="add-log-user" class="custom-select" style="width: 100%; padding: 10px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">ユーザー</label>
+                <select id="add-log-user" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
                     <!-- JSで生成 -->
                 </select>
             </div>
             <div class="form-group" style="margin-bottom: 15px;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻日時</label>
-                <input type="datetime-local" id="add-log-time" class="custom-select" style="width: 100%; padding: 10px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻日時</label>
+                <input type="datetime-local" id="add-log-time" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
             </div>
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary);">打刻種類</label>
-                <select id="add-log-type" class="custom-select" style="width: 100%; padding: 10px;">
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">打刻種類</label>
+                <select id="add-log-type" class="custom-select" style="width: 100%; padding: 12px; border-radius: 8px;">
                     <option value="出勤">出勤</option>
                     <option value="退勤">退勤</option>
                 </select>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <button id="btn-save-new-log" class="btn btn-success" style="flex: 1; padding: 10px;">追加</button>
-                <button onclick="document.getElementById('add-log-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #333;">キャンセル</button>
+            <div style="display: flex; gap: 15px;">
+                <button id="btn-save-new-log" class="btn btn-success" style="flex: 1; padding: 12px; border-radius: 8px;">追加</button>
+                <button onclick="document.getElementById('add-log-modal').classList.add('hidden')" class="btn btn-small" style="flex: 1; background: #e2e8f0; color: #475569; border-radius: 8px; font-size: 16px;">キャンセル</button>
             </div>
         </div>
     </div>
@@ -348,7 +396,7 @@
     <!-- ローディングオーバーレイ -->
     <div id="loading-overlay" class="overlay hidden">
         <div class="spinner"></div>
-        <p>通信中...</p>
+        <p style="font-weight: 500; color: var(--text-primary);">通信中...</p>
     </div>
 
     <script src="script.js"></script>
