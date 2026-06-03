@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 個別勤務表のアクション
     document.getElementById('btn-export-csv').addEventListener('click', exportIndividualCSV);
+    document.getElementById('btn-export-excel').addEventListener('click', exportToFormattedExcel);
     document.getElementById('btn-proxy-in').addEventListener('click', () => triggerProxyPunch('出勤'));
     document.getElementById('btn-proxy-out').addEventListener('click', () => triggerProxyPunch('退勤'));
 });
@@ -127,9 +128,17 @@ async function fetchDashboardData(monthStr) {
     try {
         // 設定、ユーザー、打刻データを並列取得
         const [resSettings, resUsers, resData] = await Promise.all([
-            fetch(`${GAS_WEB_APP_URL}?action=get_settings&password=${encodeURIComponent(currentPassword)}`),
+            fetch(GAS_WEB_APP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'get_settings', adminPassword: currentPassword })
+            }),
             fetch(`${GAS_WEB_APP_URL}?action=get_users`),
-            fetch(`${GAS_WEB_APP_URL}?action=get_data&month=${encodeURIComponent(monthStr)}&password=${encodeURIComponent(currentPassword)}`)
+            fetch(GAS_WEB_APP_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'get_data', month: monthStr, adminPassword: currentPassword })
+            })
         ]);
         
         const dataSettings = await resSettings.json();
@@ -302,7 +311,7 @@ function renderAggregationDashboard(rawData, employeesSettings = {}) {
 
             // 土曜日のデフォルト設定（設定がない場合のみ短縮）
             if (dayOfWeek === 6 && !userSetting.endTime) {
-                standardEnd = 13 * 60; // 13:00等にしたいが設定通りなら18:00
+                standardEnd = 13 * 60 + 30; // 13:30に統一
             }
 
             let dailyOvertime = 0;
@@ -401,21 +410,26 @@ function renderIndividualView(userId) {
         const isHoliday = !!holidaysData[dateKey];
         const isSunday = dayOfWeek === 0;
         const isSaturday = dayOfWeek === 6;
+
+        // 打刻データの取得
+        const punch = dailyLogs[dayStr];
+        const inStr = punch.in ? `${String(punch.in.getHours()).padStart(2,'0')}:${String(punch.in.getMinutes()).padStart(2,'0')}` : '-';
+        const outStr = punch.out ? `${String(punch.out.getHours()).padStart(2,'0')}:${String(punch.out.getMinutes()).padStart(2,'0')}` : '-';
+        
+        // 片打刻（打刻漏れ）の判定
+        const isPunchMissing = (punch.in && !punch.out) || (!punch.in && punch.out);
         
         let rowClass = '';
         let dateColorStyle = '';
-        if (isSunday || isHoliday) {
+        if (isPunchMissing) {
+            rowClass = 'style="background: rgba(245, 158, 11, 0.15);"'; // 薄いオレンジ背景
+        } else if (isSunday || isHoliday) {
             rowClass = 'style="background: rgba(239, 68, 68, 0.04);"';
             dateColorStyle = 'color: var(--accent-red); font-weight: bold;';
         } else if (isSaturday) {
             rowClass = 'style="background: rgba(59, 130, 246, 0.04);"';
             dateColorStyle = 'color: var(--accent-blue); font-weight: bold;';
         }
-
-        // 打刻データの取得
-        const punch = dailyLogs[dayStr];
-        const inStr = punch.in ? `${String(punch.in.getHours()).padStart(2,'0')}:${String(punch.in.getMinutes()).padStart(2,'0')}` : '-';
-        const outStr = punch.out ? `${String(punch.out.getHours()).padStart(2,'0')}:${String(punch.out.getMinutes()).padStart(2,'0')}` : '-';
         
         // 新設の「日別勤務データ」から有給、承認状態、日報を取得
         const dailyState = monthlyDailyData.find(item => item.date === dateKey && item.userId === userId) || {};
@@ -424,6 +438,8 @@ function renderIndividualView(userId) {
         let typeVal = dailyState.type || '';
         if (!typeVal && punch.in && punch.out) {
             typeVal = '出勤';
+        } else if (!typeVal && isPunchMissing) {
+            typeVal = '⚠️打刻漏れ';
         }
         
         // 労働時間の計算
@@ -448,6 +464,12 @@ function renderIndividualView(userId) {
             // 時間外(残業)計算: 契約退勤時刻より後の時間、または休日労働
             let dailyStandardStart = defStartMins;
             let dailyStandardEnd = defEndMins;
+            
+            // 土曜日のデフォルト設定（設定がない場合のみ短縮）
+            if (dayOfWeek === 6 && !user.endTime) {
+                dailyStandardEnd = 13 * 60 + 30; // 13:30
+            }
+            
             if (isSunday || isHoliday) {
                 // 休日はすべて時間外
                 overtimeMins = netMins;
@@ -457,6 +479,22 @@ function renderIndividualView(userId) {
                 }
             }
             totalOvertimeMinutes += overtimeMins;
+        } else if (typeVal === '有給' || typeVal === '特別休暇' || typeVal === '半給') {
+            let factor = 1.0;
+            if (typeVal === '半給') factor = 0.5;
+            
+            let dailyStandardStart = defStartMins;
+            let dailyStandardEnd = defEndMins;
+            if (dayOfWeek === 6 && !user.endTime) {
+                dailyStandardEnd = 13 * 60 + 30; // 13:30
+            }
+            
+            const todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes;
+            const standardDailyMinutes = dailyStandardEnd - dailyStandardStart - todayBreak;
+            netMins = Math.round(standardDailyMinutes * factor);
+            if (netMins < 0) netMins = 0;
+            
+            totalWorkMinutes += netMins;
         }
 
         const formatMinutes = (mins) => {
@@ -488,7 +526,7 @@ function renderIndividualView(userId) {
                 <td><span style="font-weight: 500;">${typeVal || '-'}</span></td>
                 <td><span style="${dateColorStyle}">${shortDateStr}</span></td>
                 <td>${inStr}</td>
-                <td>${user.endTime || '19:00'}</td>
+                <td>${dayOfWeek === 6 && !user.endTime ? '13:30' : (user.endTime || '19:00')}</td>
                 <td>${outStr}</td>
                 <td>${punch.in && punch.out ? ((dayOfWeek === 6) ? 0 : breakMinutes) + '分' : '-'}</td>
                 <td><strong>${formatMinutes(netMins)}</strong></td>
@@ -1068,7 +1106,7 @@ async function exportToFormattedExcel() {
     
     worksheet.getCell('H10').value = document.getElementById('indiv-work-days').textContent.replace('日', '');
     worksheet.mergeCells('I10:J10');
-    worksheet.getCell('I10').value = document.getElementById('indiv-overtime').textContent;
+    worksheet.getCell('I10').value = document.getElementById('indiv-overtime-hours').textContent;
 
     ['A10','C10','E10','F10','G10','H10','I10'].forEach(cell => {
         const c = worksheet.getCell(cell);

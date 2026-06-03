@@ -32,7 +32,73 @@ setInterval(updateClock, 1000);
 document.addEventListener('DOMContentLoaded', () => {
     updateClock(); // 初回実行
     initUserSelect(); // ユーザーリストの生成
+    
+    // ユーザー選択変更イベントの監視を追加
+    const select = document.getElementById('user-select');
+    if (select) {
+        select.addEventListener('change', handleUserChange);
+    }
 });
+
+// ユーザー変更時の打刻ステータス判定
+async function handleUserChange() {
+    const userSelect = document.getElementById('user-select');
+    const userId = userSelect.value;
+    const btnIn = document.getElementById('btn-clock-in');
+    const btnOut = document.getElementById('btn-clock-out');
+    
+    if (!userId) {
+        btnIn.disabled = false;
+        btnOut.disabled = false;
+        btnIn.style.opacity = '1';
+        btnOut.style.opacity = '1';
+        return;
+    }
+    
+    if (GAS_WEB_APP_URL.includes('YOUR_SCRIPT_ID_HERE')) return;
+    
+    // ロード中は一時的に無効化
+    btnIn.disabled = true;
+    btnOut.disabled = true;
+    
+    try {
+        const response = await fetch(`${GAS_WEB_APP_URL}?action=get_punch_status&userId=${encodeURIComponent(userId)}`);
+        const result = await response.json();
+        
+        if (result.status === 'success' && result.data) {
+            const punchStatus = result.data.status; // 'none', 'in', 'out'
+            
+            if (punchStatus === 'none') {
+                btnIn.disabled = false;
+                btnOut.disabled = true;
+                btnIn.style.opacity = '1';
+                btnOut.style.opacity = '0.4';
+            } else if (punchStatus === 'in') {
+                btnIn.disabled = true;
+                btnOut.disabled = false;
+                btnIn.style.opacity = '0.4';
+                btnOut.style.opacity = '1';
+            } else if (punchStatus === 'out') {
+                btnIn.disabled = true;
+                btnOut.disabled = true;
+                btnIn.style.opacity = '0.4';
+                btnOut.style.opacity = '0.4';
+                showStatus('本日は既に退勤済みです。', 'success');
+            }
+        } else {
+            btnIn.disabled = false;
+            btnOut.disabled = false;
+            btnIn.style.opacity = '1';
+            btnOut.style.opacity = '1';
+        }
+    } catch (error) {
+        console.error('打刻ステータスの取得に失敗:', error);
+        btnIn.disabled = false;
+        btnOut.disabled = false;
+        btnIn.style.opacity = '1';
+        btnOut.style.opacity = '1';
+    }
+}
 
 // GASから従業員リストを取得してプルダウンを生成
 async function initUserSelect() {
@@ -108,6 +174,7 @@ async function submitAttendance(type) {
             showStatus(`${userName} さん、${actionText}の打刻が完了しました！`, 'success');
             // セレクトボックスをリセット
             userSelect.value = '';
+            handleUserChange(); // ボタン無効化状態をリセット
         } else {
             throw new Error(result.message || 'サーバーエラーが発生しました');
         }

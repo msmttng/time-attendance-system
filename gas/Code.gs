@@ -89,8 +89,69 @@ function doPost(e) {
     const settings = getSettings();
 
     // 管理者認証が必要なアクション
-    if (['save_settings', 'save_user', 'delete_user', 'update_log', 'delete_log', 'add_log', 'update_daily_status'].includes(action)) {
+    if (['save_settings', 'save_user', 'delete_user', 'update_log', 'delete_log', 'add_log', 'update_daily_status', 'get_settings', 'get_data'].includes(action)) {
       if (payload.adminPassword !== settings.password) throw new Error('認証エラー');
+    }
+
+    if (action === 'get_settings') {
+      return createSuccessResponse(null, settings);
+    }
+
+    if (action === 'get_data') {
+      const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      const dailySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DAILY_SHEET_NAME);
+      const targetMonth = payload.month;
+      
+      // 1. 打刻履歴の取得
+      let logs = [];
+      if (logSheet) {
+        const data = logSheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          const serverTimeStr = row[0] instanceof Date ? row[0].toISOString() : row[0];
+          
+          if (targetMonth) {
+            const dateObj = new Date(serverTimeStr);
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            if (`${yyyy}-${mm}` !== targetMonth) continue;
+          }
+          
+          logs.push({
+            rowNumber: i + 1,
+            serverTime: serverTimeStr,
+            userId: row[1],
+            userName: row[2],
+            type: row[3],
+            clientTime: row[4]
+          });
+        }
+      }
+      
+      // 2. 日別勤務データの取得
+      let dailyData = [];
+      if (dailySheet) {
+        const data = dailySheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          const dateObj = row[0] instanceof Date ? row[0] : new Date(row[0]);
+          const dateStr = Utilities.formatDate(dateObj, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          
+          if (targetMonth) {
+            if (!dateStr.startsWith(targetMonth)) continue;
+          }
+          
+          dailyData.push({
+            date: dateStr,
+            userId: String(row[1]),
+            type: row[2] || '',
+            status: row[3] || '',
+            report: row[4] || ''
+          });
+        }
+      }
+      
+      return createSuccessResponse(null, { logs: logs, dailyData: dailyData });
     }
 
     if (action === 'save_settings') {
@@ -293,71 +354,35 @@ function doGet(e) {
       return createSuccessResponse(null, getEmployees());
     }
     
-    if (action === 'get_settings') {
-      const settings = getSettings();
-      if (e.parameter.password !== settings.password) throw new Error('認証エラー');
-      return createSuccessResponse(null, settings);
-    }
-    
-    if (action === 'get_data') {
-      const settings = getSettings();
-      if (e.parameter.password !== settings.password) throw new Error('パスワードが間違っています。');
+    if (action === 'get_punch_status') {
+      const userId = e.parameter.userId;
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      if (!sheet) return createSuccessResponse(null, { status: 'none' });
       
-      const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-      const dailySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DAILY_SHEET_NAME);
+      const data = sheet.getDataRange().getValues();
+      const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
       
-      const targetMonth = e.parameter.month;
+      let hasIn = false;
+      let hasOut = false;
       
-      // 1. 打刻履歴の取得
-      let logs = [];
-      if (logSheet) {
-        const data = logSheet.getDataRange().getValues();
-        for (let i = 1; i < data.length; i++) {
-          const row = data[i];
-          const serverTimeStr = row[0] instanceof Date ? row[0].toISOString() : row[0];
-          
-          if (targetMonth) {
-            const dateObj = new Date(serverTimeStr);
-            const yyyy = dateObj.getFullYear();
-            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-            if (`${yyyy}-${mm}` !== targetMonth) continue;
-          }
-          
-          logs.push({
-            rowNumber: i + 1,
-            serverTime: serverTimeStr,
-            userId: row[1],
-            userName: row[2],
-            type: row[3],
-            clientTime: row[4]
-          });
+      for (let i = 1; i < data.length; i++) {
+        const rowDate = data[i][0];
+        const rowUserId = data[i][1];
+        const type = data[i][3];
+        
+        const rowDateStr = rowDate instanceof Date ? Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(rowDate).substring(0, 10);
+        
+        if (rowDateStr === todayStr && String(rowUserId) === String(userId)) {
+          if (type === '出勤') hasIn = true;
+          if (type === '退勤') hasOut = true;
         }
       }
       
-      // 2. 日別勤務データの取得
-      let dailyData = [];
-      if (dailySheet) {
-        const data = dailySheet.getDataRange().getValues();
-        for (let i = 1; i < data.length; i++) {
-          const row = data[i];
-          const dateObj = row[0] instanceof Date ? row[0] : new Date(row[0]);
-          const dateStr = Utilities.formatDate(dateObj, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-          
-          if (targetMonth) {
-            if (!dateStr.startsWith(targetMonth)) continue;
-          }
-          
-          dailyData.push({
-            date: dateStr,
-            userId: String(row[1]),
-            type: row[2] || '',
-            status: row[3] || '',
-            report: row[4] || ''
-          });
-        }
-      }
+      let punchStatus = 'none';
+      if (hasIn && !hasOut) punchStatus = 'in';
+      else if (hasIn && hasOut) punchStatus = 'out';
       
-      return createSuccessResponse(null, { logs: logs, dailyData: dailyData });
+      return createSuccessResponse(null, { status: punchStatus });
     }
     
     return ContentService.createTextOutput("API is running.");
@@ -382,9 +407,8 @@ function monthlyAggregationAndNotify() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
   if (!sheet) return;
   const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return;
   
-  const rows = data.slice(1);
+  const rows = data.length > 1 ? data.slice(1) : [];
   const settings = getSettings();
   const employees = getEmployees();
   
@@ -398,13 +422,34 @@ function monthlyAggregationAndNotify() {
     const res = UrlFetchApp.fetch('https://holidays-jp.github.io/api/v1/date.json');
     holidaysData = JSON.parse(res.getContentText());
   } catch (e) {}
+
+  // 日別勤務データ（有給・特別休暇など）の取得
+  const dailySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DAILY_SHEET_NAME);
+  let dailyData = {};
+  if (dailySheet) {
+    const dData = dailySheet.getDataRange().getValues();
+    for (let i = 1; i < dData.length; i++) {
+      const rowDate = dData[i][0];
+      const dateStr = rowDate instanceof Date ? Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(rowDate).substring(0, 10);
+      const rowUserId = String(dData[i][1]);
+      const type = dData[i][2] || '';
+      const key = `${rowUserId}_${dateStr}`;
+      dailyData[key] = type;
+    }
+  }
   
+  // 従業員ごとに初期化
   const userLogs = {};
+  for (const empId in employees) {
+    userLogs[empId] = { name: employees[empId].name, days: {} };
+  }
+  
   rows.forEach(row => {
     const dateObj = new Date(row[0]);
     if (dateObj.getFullYear() !== targetYear || (dateObj.getMonth() + 1) !== targetMonth) return;
-    const userId = row[1], userName = row[2], type = row[3];
+    const userId = String(row[1]), userName = row[2], type = row[3];
     const dayStr = String(dateObj.getDate()).padStart(2, '0');
+    
     if (!userLogs[userId]) userLogs[userId] = { name: userName, days: {} };
     if (!userLogs[userId].days[dayStr]) userLogs[userId].days[dayStr] = { date: dateObj, in: null, out: null };
     const dayLog = userLogs[userId].days[dayStr];
@@ -421,31 +466,54 @@ function monthlyAggregationAndNotify() {
     const breakMinutes = employees[userId] ? employees[userId].breakMinutes : 0;
     let totalNetMinutes = 0, totalOvertimeMinutes = 0, workDays = 0;
     
-    for (const day in user.days) {
-      const log = user.days[day];
-      if (!log.in || !log.out) continue;
-      workDays++;
-      const inMins = log.in.getHours() * 60 + log.in.getMinutes();
-      const outMins = log.out.getHours() * 60 + log.out.getMinutes();
-      const dayOfWeek = log.date.getDay(); 
-      let grossMins = outMins - inMins;
-      if (grossMins < 0) grossMins = 0;
-      let todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes;
-      let netMins = grossMins - todayBreak;
-      if (netMins < 0) netMins = 0;
-      totalNetMinutes += netMins;
-      const dateStr = `${log.date.getFullYear()}-${String(log.date.getMonth() + 1).padStart(2, '0')}-${String(log.date.getDate()).padStart(2, '0')}`;
+    const lastDay = new Date(targetYear, targetMonth, 0).getDate();
+    for (let d = 1; d <= lastDay; d++) {
+      const dayStr = String(d).padStart(2, '0');
+      const dateObj = new Date(targetYear, targetMonth - 1, d);
+      const dateStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${dayStr}`;
+      const dayOfWeek = dateObj.getDay();
+      
+      const log = user.days[dayStr] || { date: dateObj, in: null, out: null };
+      const typeVal = dailyData[`${userId}_${dateStr}`] || '';
       const isHoliday = !!holidaysData[dateStr] || dayOfWeek === 0;
-      let standardStart = 0, standardEnd = 0;
-      if (!isHoliday) {
-          if (dayOfWeek >= 1 && dayOfWeek <= 5) { standardStart = 9 * 60 + 15; standardEnd = 19 * 60; }
-          else if (dayOfWeek === 6) { standardStart = 9 * 60 + 15; standardEnd = 13 * 60 + 30; }
+      
+      const empSetting = employees[userId] || {};
+      const empStart = empSetting.startTime || '09:00';
+      let empEnd = empSetting.endTime || '18:00';
+      if (dayOfWeek === 6 && !empSetting.endTime) {
+        empEnd = '13:30';
       }
-      let dailyOvertime = 0;
-      for (let m = inMins; m < outMins; m++) {
-          if (isHoliday || m < standardStart || m >= standardEnd) dailyOvertime++;
+      const [startH, startM] = empStart.split(':').map(Number);
+      const [endH, endM] = empEnd.split(':').map(Number);
+      const standardStart = startH * 60 + startM;
+      const standardEnd = endH * 60 + endM;
+      
+      if (log.in && log.out) {
+        workDays++;
+        const inMins = log.in.getHours() * 60 + log.in.getMinutes();
+        const outMins = log.out.getHours() * 60 + log.out.getMinutes();
+        let grossMins = outMins - inMins;
+        if (grossMins < 0) grossMins = 0;
+        let todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes;
+        let netMins = grossMins - todayBreak;
+        if (netMins < 0) netMins = 0;
+        totalNetMinutes += netMins;
+        
+        let dailyOvertime = 0;
+        for (let m = inMins; m < outMins; m++) {
+            if (isHoliday || m < standardStart || m >= standardEnd) dailyOvertime++;
+        }
+        totalOvertimeMinutes += dailyOvertime;
+      } else if (typeVal === '有給' || typeVal === '特別休暇' || typeVal === '半給') {
+        let factor = 1.0;
+        if (typeVal === '半給') factor = 0.5;
+        
+        const todayBreak = (dayOfWeek === 6) ? 0 : breakMinutes;
+        const standardDailyMinutes = standardEnd - standardStart - todayBreak;
+        let netMins = Math.round(standardDailyMinutes * factor);
+        if (netMins < 0) netMins = 0;
+        totalNetMinutes += netMins;
       }
-      totalOvertimeMinutes += dailyOvertime;
     }
     const formatTime = (mins) => `${Math.floor(mins / 60)}時間 ${mins % 60}分`;
     reportText += `👤 ${user.name}: 出勤 ${workDays}日 / 実働 ${formatTime(totalNetMinutes)} / 残業 ${formatTime(totalOvertimeMinutes)}\n`;
