@@ -128,17 +128,9 @@ async function fetchDashboardData(monthStr) {
     try {
         // 設定、ユーザー、打刻データを並列取得
         const [resSettings, resUsers, resData] = await Promise.all([
-            fetch(GAS_WEB_APP_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'get_settings', adminPassword: currentPassword })
-            }),
+            fetch(`${GAS_WEB_APP_URL}?action=get_settings&password=${encodeURIComponent(currentPassword)}`),
             fetch(`${GAS_WEB_APP_URL}?action=get_users`),
-            fetch(GAS_WEB_APP_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'get_data', month: monthStr, adminPassword: currentPassword })
-            })
+            fetch(`${GAS_WEB_APP_URL}?action=get_data&month=${encodeURIComponent(monthStr)}&password=${encodeURIComponent(currentPassword)}`)
         ]);
         
         const dataSettings = await resSettings.json();

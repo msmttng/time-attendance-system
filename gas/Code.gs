@@ -385,6 +385,73 @@ function doGet(e) {
       return createSuccessResponse(null, { status: punchStatus });
     }
     
+    if (action === 'get_settings') {
+      const settings = getSettings();
+      if (e.parameter.password !== settings.password) throw new Error('認証エラー');
+      return createSuccessResponse(null, settings);
+    }
+    
+    if (action === 'get_data') {
+      const settings = getSettings();
+      if (e.parameter.password !== settings.password) throw new Error('パスワードが間違っています。');
+      
+      const logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+      const dailySheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DAILY_SHEET_NAME);
+      
+      const targetMonth = e.parameter.month;
+      
+      // 1. 打刻履歴の取得
+      let logs = [];
+      if (logSheet) {
+        const data = logSheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          const serverTimeStr = row[0] instanceof Date ? row[0].toISOString() : row[0];
+          
+          if (targetMonth) {
+            const dateObj = new Date(serverTimeStr);
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            if (`${yyyy}-${mm}` !== targetMonth) continue;
+          }
+          
+          logs.push({
+            rowNumber: i + 1,
+            serverTime: serverTimeStr,
+            userId: row[1],
+            userName: row[2],
+            type: row[3],
+            clientTime: row[4]
+          });
+        }
+      }
+      
+      // 2. 日別勤務データの取得
+      let dailyData = [];
+      if (dailySheet) {
+        const data = dailySheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          const dateObj = row[0] instanceof Date ? row[0] : new Date(row[0]);
+          const dateStr = Utilities.formatDate(dateObj, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          
+          if (targetMonth) {
+            if (!dateStr.startsWith(targetMonth)) continue;
+          }
+          
+          dailyData.push({
+            date: dateStr,
+            userId: String(row[1]),
+            type: row[2] || '',
+            status: row[3] || '',
+            report: row[4] || ''
+          });
+        }
+      }
+      
+      return createSuccessResponse(null, { logs: logs, dailyData: dailyData });
+    }
+    
     return ContentService.createTextOutput("API is running.");
     
   } catch (error) {
