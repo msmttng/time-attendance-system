@@ -290,11 +290,19 @@ function renderAggregationDashboard(rawData, employeesSettings = {}) {
             const dateStr = `${yyyy}-${mm}-${dd}`;
             
             const isHoliday = !!holidaysData[dateStr] || dayOfWeek === 0;
-            let standardStart = 0, standardEnd = 0;
+            
+            // ユーザー固有の所定時間を使用する
+            const userSetting = employeesSettings[userId] || {};
+            const defaultStartStr = userSetting.startTime || '09:00';
+            const defaultEndStr = userSetting.endTime || '18:00';
+            const [defStartH, defStartM] = defaultStartStr.split(':').map(Number);
+            const [defEndH, defEndM] = defaultEndStr.split(':').map(Number);
+            let standardStart = defStartH * 60 + defStartM;
+            let standardEnd = defEndH * 60 + defEndM;
 
-            if (!isHoliday) {
-                if (dayOfWeek >= 1 && dayOfWeek <= 5) { standardStart = 9 * 60 + 15; standardEnd = 19 * 60; }
-                else if (dayOfWeek === 6) { standardStart = 9 * 60 + 15; standardEnd = 13 * 60 + 30; }
+            // 土曜日のデフォルト設定（設定がない場合のみ短縮）
+            if (dayOfWeek === 6 && !userSetting.endTime) {
+                standardEnd = 13 * 60; // 13:00等にしたいが設定通りなら18:00
             }
 
             let dailyOvertime = 0;
