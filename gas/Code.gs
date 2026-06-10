@@ -451,6 +451,12 @@ function doGet(e) {
       return createSuccessResponse(null, responseData);
     }
     
+    if (action === 'get_admin_users') {
+      const settings = getSettings();
+      if (e.parameter.password !== settings.password) throw new Error('認証エラー');
+      return createSuccessResponse(null, getEmployees());
+    }
+    
     if (action === 'get_punch_status') {
       const userId = e.parameter.userId;
       const status = getTodayPunchStatus(userId);

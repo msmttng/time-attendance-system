@@ -129,7 +129,7 @@ async function fetchDashboardData(monthStr) {
         // 設定、ユーザー、打刻データを並列取得
         const [resSettings, resUsers, resData] = await Promise.all([
             fetch(`${GAS_WEB_APP_URL}?action=get_settings&password=${encodeURIComponent(currentPassword)}`),
-            fetch(`${GAS_WEB_APP_URL}?action=get_users`),
+            fetch(`${GAS_WEB_APP_URL}?action=get_admin_users&password=${encodeURIComponent(currentPassword)}`),
             fetch(`${GAS_WEB_APP_URL}?action=get_data&month=${encodeURIComponent(monthStr)}&password=${encodeURIComponent(currentPassword)}`)
         ]);
         
