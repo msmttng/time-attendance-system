@@ -82,6 +82,63 @@ function getEmployees() {
   return employees;
 }
 
+function getPublicEmployees() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('users_v1');
+  if (cached) return JSON.parse(cached);
+  
+  const employees = getEmployees();
+  const publicEmployees = {};
+  for (const id in employees) {
+    publicEmployees[id] = { name: employees[id].name };
+  }
+  
+  cache.put('users_v1', JSON.stringify(publicEmployees), 21600);
+  return publicEmployees;
+}
+
+function getTodayPunchStatus(userId) {
+  const cache = CacheService.getScriptCache();
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const cacheKey = `punch_${todayStr}_${userId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+  
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+  if (!sheet) return 'none';
+  
+  const data = sheet.getDataRange().getValues();
+  let punchStatus = 'none';
+  let hasIn = false;
+  let hasOut = false;
+  
+  for (let i = data.length - 1; i >= 1; i--) {
+    const rowDate = data[i][0];
+    if (!rowDate) continue;
+    
+    const rowDateStr = rowDate instanceof Date ? Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(rowDate).substring(0, 10);
+    if (rowDateStr < todayStr) break;
+    
+    if (rowDateStr === todayStr && String(data[i][1]) === String(userId)) {
+      const type = data[i][3];
+      if (type === '出勤') hasIn = true;
+      if (type === '退勤') hasOut = true;
+    }
+  }
+  
+  if (hasIn && !hasOut) punchStatus = 'in';
+  else if (hasIn && hasOut) punchStatus = 'out';
+  
+  cache.put(cacheKey, punchStatus, 64800);
+  return punchStatus;
+}
+
+function invalidatePunchCache(userId) {
+  const cache = CacheService.getScriptCache();
+  const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  cache.remove(`punch_${todayStr}_${userId}`);
+}
+
 function doPost(e) {
   try {
     let payload = JSON.parse(e.postData.contents);
@@ -108,6 +165,7 @@ function doPost(e) {
         const data = logSheet.getDataRange().getValues();
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
+          if (!row[0]) continue;
           const serverTimeStr = row[0] instanceof Date ? row[0].toISOString() : row[0];
           
           if (targetMonth) {
@@ -206,6 +264,7 @@ function doPost(e) {
         }
       }
       if (!found) sheet.appendRow(newRow);
+      CacheService.getScriptCache().remove('users_v1');
       return createSuccessResponse('従業員情報を保存しました。');
     }
     
@@ -215,6 +274,7 @@ function doPost(e) {
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][0]) === String(payload.userId)) {
           sheet.deleteRow(i+1);
+          CacheService.getScriptCache().remove('users_v1');
           return createSuccessResponse('従業員を削除しました。');
         }
       }
@@ -226,12 +286,14 @@ function doPost(e) {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
       if (!sheet) throw new Error('打刻履歴シートが見つかりません');
       const row = payload.rowNumber;
+      const userId = sheet.getRange(row, 2).getValue();
       if (payload.newServerTime) {
         sheet.getRange(row, 1).setValue(new Date(payload.newServerTime));
       }
       if (payload.newType) {
         sheet.getRange(row, 4).setValue(payload.newType);
       }
+      invalidatePunchCache(userId);
       return createSuccessResponse('打刻データを更新しました。');
     }
 
@@ -239,7 +301,9 @@ function doPost(e) {
     if (action === 'delete_log') {
       const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
       if (!sheet) throw new Error('打刻履歴シートが見つかりません');
+      const userId = sheet.getRange(payload.rowNumber, 2).getValue();
       sheet.deleteRow(payload.rowNumber);
+      invalidatePunchCache(userId);
       return createSuccessResponse('打刻データを削除しました。');
     }
 
@@ -254,6 +318,7 @@ function doPost(e) {
       if (lastRow > 2) {
         sheet.getRange(2, 1, lastRow - 1, 5).sort({column: 1, ascending: true});
       }
+      invalidatePunchCache(payload.userId);
       return createSuccessResponse('打刻データを追加しました。');
     }
 
@@ -294,12 +359,11 @@ function doPost(e) {
             }
           }
           
+          let rowsToDelete = [];
+          
           if (payload.inTime !== undefined) {
             if (payload.inTime === '') {
-              // 空の場合は削除（セルを空にする）
-              if (inRowIndex !== -1) {
-                logSheet.getRange(inRowIndex, 1, 1, 5).clearContent();
-              }
+              if (inRowIndex !== -1) rowsToDelete.push(inRowIndex);
             } else {
               const newInDate = new Date(`${date}T${payload.inTime}:00+09:00`);
               if (inRowIndex !== -1) {
@@ -312,9 +376,7 @@ function doPost(e) {
           
           if (payload.outTime !== undefined) {
             if (payload.outTime === '') {
-              if (outRowIndex !== -1) {
-                logSheet.getRange(outRowIndex, 1, 1, 5).clearContent();
-              }
+              if (outRowIndex !== -1) rowsToDelete.push(outRowIndex);
             } else {
               const newOutDate = new Date(`${date}T${payload.outTime}:00+09:00`);
               if (outRowIndex !== -1) {
@@ -324,6 +386,9 @@ function doPost(e) {
               }
             }
           }
+          
+          rowsToDelete.sort((a,b) => b - a).forEach(r => logSheet.deleteRow(r));
+          invalidatePunchCache(userId);
         }
       }
 
@@ -333,13 +398,37 @@ function doPost(e) {
     // --- 通常の打刻 ---
     if (action === 'clock_in_out') {
       const { userId, userName, type, timestamp } = payload;
-      const serverTime = new Date();
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-      if (!sheet) { setupSheets(); throw new Error(`シート「${LOG_SHEET_NAME}」が見つかりません。`); }
-      const typeText = type === 'in' ? '出勤' : (type === 'out' ? '退勤' : type);
-      sheet.appendRow([serverTime, userId, userName, typeText, timestamp]);
-      return createSuccessResponse('打刻が正常に記録されました。');
+      
+      const publicUsers = getPublicEmployees();
+      if (!publicUsers[userId]) throw new Error('未登録のユーザーです。');
+      
+      const lock = LockService.getScriptLock();
+      try {
+        lock.waitLock(10000);
+        
+        const currentStatus = getTodayPunchStatus(userId);
+        if (type === 'in' && currentStatus === 'in') throw new Error('本日は既に出勤済みです');
+        if (type === 'out' && currentStatus === 'none') throw new Error('本日の出勤打刻がありません');
+        if (type === 'out' && currentStatus === 'out') throw new Error('本日は既に退勤済みです');
+        
+        const serverTime = new Date();
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
+        if (!sheet) { setupSheets(); throw new Error(`シート「${LOG_SHEET_NAME}」が見つかりません。`); }
+        
+        const typeText = type === 'in' ? '出勤' : '退勤';
+        sheet.appendRow([serverTime, userId, userName, typeText, timestamp]);
+        
+        const newStatus = type === 'in' ? 'in' : 'out';
+        const todayStr = Utilities.formatDate(serverTime, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        CacheService.getScriptCache().put(`punch_${todayStr}_${userId}`, newStatus, 64800);
+        
+        return createSuccessResponse('打刻が正常に記録されました。');
+      } finally {
+        lock.releaseLock();
+      }
     }
+
+    return createErrorResponse('不明なアクションです');
 
   } catch (error) {
     return createErrorResponse(error.message);
@@ -351,38 +440,21 @@ function doGet(e) {
     const action = e.parameter.action;
     
     if (action === 'get_users') {
-      return createSuccessResponse(null, getEmployees());
+      const publicUsers = getPublicEmployees();
+      const responseData = {};
+      for (const id in publicUsers) {
+        responseData[id] = {
+          name: publicUsers[id].name,
+          todayStatus: getTodayPunchStatus(id)
+        };
+      }
+      return createSuccessResponse(null, responseData);
     }
     
     if (action === 'get_punch_status') {
       const userId = e.parameter.userId;
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LOG_SHEET_NAME);
-      if (!sheet) return createSuccessResponse(null, { status: 'none' });
-      
-      const data = sheet.getDataRange().getValues();
-      const todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-      
-      let hasIn = false;
-      let hasOut = false;
-      
-      for (let i = 1; i < data.length; i++) {
-        const rowDate = data[i][0];
-        const rowUserId = data[i][1];
-        const type = data[i][3];
-        
-        const rowDateStr = rowDate instanceof Date ? Utilities.formatDate(rowDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(rowDate).substring(0, 10);
-        
-        if (rowDateStr === todayStr && String(rowUserId) === String(userId)) {
-          if (type === '出勤') hasIn = true;
-          if (type === '退勤') hasOut = true;
-        }
-      }
-      
-      let punchStatus = 'none';
-      if (hasIn && !hasOut) punchStatus = 'in';
-      else if (hasIn && hasOut) punchStatus = 'out';
-      
-      return createSuccessResponse(null, { status: punchStatus });
+      const status = getTodayPunchStatus(userId);
+      return createSuccessResponse(null, { status: status });
     }
     
     if (action === 'get_settings') {
@@ -406,6 +478,7 @@ function doGet(e) {
         const data = logSheet.getDataRange().getValues();
         for (let i = 1; i < data.length; i++) {
           const row = data[i];
+          if (!row[0]) continue;
           const serverTimeStr = row[0] instanceof Date ? row[0].toISOString() : row[0];
           
           if (targetMonth) {
@@ -512,6 +585,7 @@ function monthlyAggregationAndNotify() {
   }
   
   rows.forEach(row => {
+    if (!row[0]) return;
     const dateObj = new Date(row[0]);
     if (dateObj.getFullYear() !== targetYear || (dateObj.getMonth() + 1) !== targetMonth) return;
     const userId = String(row[1]), userName = row[2], type = row[3];

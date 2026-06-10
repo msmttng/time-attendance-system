@@ -6,6 +6,9 @@
 // TODO: GASをデプロイしたあとに発行されるWebアプリのURLをここに設定する
 const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzL9bLmEB9EAy5dyeFUpZfn5OIpXW3ILWTLBvCfKb7adYbheY-23spINckRHRJRfBiU/exec';
 
+let statusReqSeq = 0;
+let statusTimeoutTimer = null;
+
 // --- 時計機能 ---
 function updateClock() {
     const now = new Date();
@@ -47,68 +50,118 @@ async function handleUserChange() {
     const btnIn = document.getElementById('btn-clock-in');
     const btnOut = document.getElementById('btn-clock-out');
     
-    if (!userId) {
+    const resetButtons = () => {
         btnIn.disabled = false;
         btnOut.disabled = false;
         btnIn.style.opacity = '1';
         btnOut.style.opacity = '1';
+        btnIn.innerHTML = '<span class="icon">💼</span> 出勤';
+        btnOut.innerHTML = '<span class="icon">🏠</span> 退勤';
+    };
+    
+    if (!userId) {
+        resetButtons();
         return;
     }
     
     if (GAS_WEB_APP_URL.includes('YOUR_SCRIPT_ID_HERE')) return;
     
-    // ロード中は一時的に無効化
-    btnIn.disabled = true;
-    btnOut.disabled = true;
+    const cachedStr = localStorage.getItem('ta_users_v1');
+    let punchStatus = null;
+    if (cachedStr) {
+        try {
+            const cachedData = JSON.parse(cachedStr);
+            if (cachedData.data && cachedData.data[userId]) {
+                punchStatus = cachedData.data[userId].todayStatus;
+            }
+        } catch (e) {}
+    }
+
+    const applyStatus = (status) => {
+        if (status === 'none') {
+            btnIn.disabled = false;
+            btnOut.disabled = true;
+            btnIn.style.opacity = '1';
+            btnOut.style.opacity = '0.4';
+        } else if (status === 'in') {
+            btnIn.disabled = true;
+            btnOut.disabled = false;
+            btnIn.style.opacity = '0.4';
+            btnOut.style.opacity = '1';
+        } else if (status === 'out') {
+            btnIn.disabled = true;
+            btnOut.disabled = true;
+            btnIn.style.opacity = '0.4';
+            btnOut.style.opacity = '0.4';
+            showStatus('本日は既に退勤済みです。', 'success');
+        }
+        btnIn.innerHTML = '<span class="icon">💼</span> 出勤';
+        btnOut.innerHTML = '<span class="icon">🏠</span> 退勤';
+    };
+
+    if (punchStatus !== null && punchStatus !== undefined) {
+        applyStatus(punchStatus);
+        return;
+    }
+    
+    btnIn.disabled = false;
+    btnOut.disabled = false;
+    btnIn.innerHTML = '<span class="icon">💼</span> 確認中...';
+    btnOut.innerHTML = '<span class="icon">🏠</span> 確認中...';
+    
+    statusReqSeq++;
+    const currentSeq = statusReqSeq;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     
     try {
-        const response = await fetch(`${GAS_WEB_APP_URL}?action=get_punch_status&userId=${encodeURIComponent(userId)}`);
+        const response = await fetch(`${GAS_WEB_APP_URL}?action=get_punch_status&userId=${encodeURIComponent(userId)}`, { signal: controller.signal });
+        clearTimeout(timeoutId);
         const result = await response.json();
         
+        if (currentSeq !== statusReqSeq) return;
+        
         if (result.status === 'success' && result.data) {
-            const punchStatus = result.data.status; // 'none', 'in', 'out'
-            
-            if (punchStatus === 'none') {
-                btnIn.disabled = false;
-                btnOut.disabled = true;
-                btnIn.style.opacity = '1';
-                btnOut.style.opacity = '0.4';
-            } else if (punchStatus === 'in') {
-                btnIn.disabled = true;
-                btnOut.disabled = false;
-                btnIn.style.opacity = '0.4';
-                btnOut.style.opacity = '1';
-            } else if (punchStatus === 'out') {
-                btnIn.disabled = true;
-                btnOut.disabled = true;
-                btnIn.style.opacity = '0.4';
-                btnOut.style.opacity = '0.4';
-                showStatus('本日は既に退勤済みです。', 'success');
-            }
+            applyStatus(result.data.status);
         } else {
-            btnIn.disabled = false;
-            btnOut.disabled = false;
-            btnIn.style.opacity = '1';
-            btnOut.style.opacity = '1';
+            resetButtons();
         }
     } catch (error) {
+        clearTimeout(timeoutId);
+        if (currentSeq !== statusReqSeq) return;
         console.error('打刻ステータスの取得に失敗:', error);
-        btnIn.disabled = false;
-        btnOut.disabled = false;
-        btnIn.style.opacity = '1';
-        btnOut.style.opacity = '1';
+        resetButtons();
+    }
+}
+
+function buildSelectOptions(select, data) {
+    select.innerHTML = '<option value="" disabled selected>選択してください</option>';
+    for (const [id, user] of Object.entries(data)) {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = user.name;
+        select.appendChild(option);
     }
 }
 
 // GASから従業員リストを取得してプルダウンを生成
 async function initUserSelect() {
     const select = document.getElementById('user-select');
-    if (!select) return; // 管理画面等で要素がない場合は何もしない
+    if (!select) return;
     
     if (GAS_WEB_APP_URL.includes('YOUR_SCRIPT_ID_HERE')) {
-        // デモ用データ
         select.innerHTML = '<option value="" disabled selected>選択してください</option><option value="user001">山田 太郎 (デモ)</option><option value="user002">佐藤 花子 (デモ)</option>';
         return;
+    }
+
+    const cachedStr = localStorage.getItem('ta_users_v1');
+    if (cachedStr) {
+        try {
+            const cachedData = JSON.parse(cachedStr);
+            buildSelectOptions(select, cachedData.data);
+        } catch (e) {}
+    } else {
+        select.innerHTML = '<option value="" disabled selected>読み込み中...</option>';
     }
 
     try {
@@ -116,17 +169,19 @@ async function initUserSelect() {
         const result = await response.json();
         
         if (result.status === 'success' && result.data) {
-            select.innerHTML = '<option value="" disabled selected>選択してください</option>';
-            for (const [id, user] of Object.entries(result.data)) {
-                const option = document.createElement('option');
-                option.value = id;
-                option.textContent = user.name;
-                select.appendChild(option);
+            localStorage.setItem('ta_users_v1', JSON.stringify({ ts: Date.now(), data: result.data }));
+            const currentValue = select.value;
+            buildSelectOptions(select, result.data);
+            if (currentValue && result.data[currentValue]) {
+                select.value = currentValue;
+                handleUserChange();
             }
         }
     } catch (error) {
         console.error('従業員リストの取得に失敗:', error);
-        select.innerHTML = '<option value="" disabled selected>通信エラー</option>';
+        if (!cachedStr) {
+            select.innerHTML = '<option value="" disabled selected>通信エラー</option>';
+        }
     }
 }
 
@@ -136,11 +191,18 @@ async function submitAttendance(type) {
     const userId = userSelect.value;
     const userName = userSelect.options[userSelect.selectedIndex].text;
 
+    const btnIn = document.getElementById('btn-clock-in');
+    const btnOut = document.getElementById('btn-clock-out');
+
     // バリデーション
     if (!userId) {
         showStatus('ユーザーを選択してください。', 'error');
         return;
     }
+
+    // 連打防止
+    btnIn.disabled = true;
+    btnOut.disabled = true;
 
     // ローディング表示
     const overlay = document.getElementById('loading-overlay');
@@ -150,17 +212,12 @@ async function submitAttendance(type) {
         userId: userId,
         userName: userName,
         type: type, // 'in' or 'out'
-        timestamp: new Date().toISOString(), // クライアント側の参考時刻（正確な時刻はGAS側で取る）
+        timestamp: new Date().toISOString(),
     };
 
     try {
-        // Fetch APIでGASへPOST送信 (no-corsモードはレスポンスが読めないので標準モードを使用、GAS側でCORS対応が必要)
-        // または、GASの仕様上 POSTリクエストをJSONで送る場合は、text/plainとして送りGAS側でパースするワークアラウンドが一般的です。
-        
         const response = await fetch(GAS_WEB_APP_URL, {
             method: 'POST',
-            // redirect: 'follow', // GASのリダイレクトに対応
-            // Content-Type を text/plain にすることでCORSプリフライトを回避できるケースがあります
             headers: {
                 'Content-Type': 'text/plain;charset=utf-8',
             },
@@ -172,16 +229,25 @@ async function submitAttendance(type) {
         if (result.status === 'success') {
             const actionText = type === 'in' ? '出勤' : '退勤';
             showStatus(`${userName} さん、${actionText}の打刻が完了しました！`, 'success');
-            // セレクトボックスをリセット
+            
+            const cachedStr = localStorage.getItem('ta_users_v1');
+            if (cachedStr) {
+                try {
+                    const cachedData = JSON.parse(cachedStr);
+                    if (cachedData.data && cachedData.data[userId]) {
+                        cachedData.data[userId].todayStatus = type === 'in' ? 'in' : 'out';
+                        localStorage.setItem('ta_users_v1', JSON.stringify(cachedData));
+                    }
+                } catch(e) {}
+            }
+            
             userSelect.value = '';
-            handleUserChange(); // ボタン無効化状態をリセット
         } else {
             throw new Error(result.message || 'サーバーエラーが発生しました');
         }
 
     } catch (error) {
         console.error('Error:', error);
-        // モック動作（GAS URLが未設定の場合のエラーフォールバック用）
         if (GAS_WEB_APP_URL.includes('YOUR_SCRIPT_ID_HERE')) {
             setTimeout(() => {
                 const actionText = type === 'in' ? '出勤' : '退勤';
@@ -192,10 +258,22 @@ async function submitAttendance(type) {
             return;
         }
 
-        showStatus(`通信エラーが発生しました: ${error.message}`, 'error');
+        showStatus(`エラー: ${error.message}`, 'error');
+        
+        const cachedStr = localStorage.getItem('ta_users_v1');
+        if (cachedStr) {
+            try {
+                const cachedData = JSON.parse(cachedStr);
+                if (cachedData.data && cachedData.data[userId]) {
+                    delete cachedData.data[userId].todayStatus;
+                    localStorage.setItem('ta_users_v1', JSON.stringify(cachedData));
+                }
+            } catch(e) {}
+        }
     } finally {
         if (!GAS_WEB_APP_URL.includes('YOUR_SCRIPT_ID_HERE')) {
             overlay.classList.add('hidden');
+            handleUserChange();
         }
     }
 }
@@ -206,8 +284,8 @@ function showStatus(message, type) {
     statusEl.textContent = message;
     statusEl.className = `status-message status-${type} show`;
 
-    // 5秒後に消す
-    setTimeout(() => {
+    if (statusTimeoutTimer) clearTimeout(statusTimeoutTimer);
+    statusTimeoutTimer = setTimeout(() => {
         statusEl.classList.remove('show');
     }, 5000);
 }
