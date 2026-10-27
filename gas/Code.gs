@@ -1,5 +1,6 @@
 /**
  * スマート打刻システム - GAS バックエンド (従業員個別詳細勤務表・契約個人設定・承認管理対応版)
+ * v1.3.0: 出退勤スイッチ（ESP32 端末）連携を追加（処理本体は Device.gs）
  */
 
 const LOG_SHEET_NAME = '打刻履歴';
@@ -436,6 +437,8 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  // 出退勤スイッチ（ESP32 端末）からの呼び出しは Device.gs で処理（token 付きのものだけ）
+  if (e && e.parameter && e.parameter.token) return handleDeviceRequest_(e);
   try {
     const action = e.parameter.action;
     
