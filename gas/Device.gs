@@ -1,5 +1,5 @@
 /**
- * スマート打刻システム - 出退勤スイッチ（ESP32 端末）連携  v1.3.0
+ * スマート打刻システム - 出退勤スイッチ（ESP32 端末）連携  v1.4.0
  *
  * 物理スイッチ端末（ATOM Lite＋トグルスイッチ2個）からの打刻を、
  * 既存の「打刻履歴」シートに Web 画面の打刻と同じ形式で書き込みます。
@@ -15,6 +15,9 @@
  * 端末からの呼び出し（端末のプログラムは変更不要。GAS_URL と TOKEN を書き換えるだけ）:
  *   GET <URL>?token=...&ping=1
  *   GET <URL>?token=...&slot=a|b&action=in|out&id=<イベントID>&age=<押してからの秒数>
+ *   v1.4.0〜 端末は次も付けて送る（無くても動く）:
+ *     &wifi=<つながっているWi-Fi名>&place=<自宅|薬局>&rssi=<電波dBm>&ip=<端末のアドレス>&fw=<ファームウェア>&pend=<未送信の件数>
+ *   → 「端末状態」シートの2行目に、最後に通信した時刻と一緒に上書きで記録する（1行だけ。増えない）
  * 返り値(JSON): {code:"ok"|"warn"|"error", msg, action, st_a, st_b, retry?}
  *   st_a / st_b … "on"（出勤中）/ "off"（出勤中でない）/ "stale"（出勤のまま16時間以上）
  *
@@ -28,6 +31,8 @@ const DEV_CLIENT_LABEL = '出退勤スイッチ';
 const DEV_STALE_HOURS = 16;     // これ以上前の「出勤のみ」は退勤の押し忘れとみなす
 const DEV_SCAN_ROWS = 600;      // 打刻履歴を下から何行さかのぼって探すか
 const DEV_MAX_AGE_SEC = 48 * 3600;
+const DEV_STATUS_SHEET = '端末状態';
+const DEV_STATUS_HEAD = ['最終通信時刻', '種類', 'つながっているWi-Fi', '場所', '電波(dBm)', '端末のアドレス', 'ファームウェア', '未送信の記録'];
 
 /* ======================= 初期設定（エディタから1回実行） ======================= */
 function setupDevice() {
@@ -65,6 +70,7 @@ function handleDeviceRequest_(e) {
 
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    devSaveStatus_(ss, p);
     const map = devSlotMap_(ss);
 
     if (p.ping) {
@@ -123,6 +129,35 @@ function handleDeviceRequest_(e) {
   } catch (err) {
     return devJson_({ code: 'error', msg: 'サーバーエラー: ' + err.message, retry: true });
   }
+}
+
+/* ======================= 端末の状態（つながっているWi-Fiなど） ======================= */
+/** 端末から届いた状態を「端末状態」シートの2行目に上書きする。失敗しても打刻は止めない */
+function devSaveStatus_(ss, p) {
+  try {
+    if (!p.fw && !p.wifi) return;   // 古いファームウェア（状態を送らない）
+    let sh = ss.getSheetByName(DEV_STATUS_SHEET);
+    if (!sh) {
+      sh = ss.insertSheet(DEV_STATUS_SHEET);
+      sh.getRange(1, 1, 1, DEV_STATUS_HEAD.length).setValues([DEV_STATUS_HEAD]);
+      sh.setFrozenRows(1);
+    }
+    const kind = p.ping ? '接続確認' : ((p.slot === 'a' ? '左' : '右') + (p.action === 'in' ? ' 出勤' : ' 退勤'));
+    const rssi = Number(p.rssi);
+    const pend = Number(p.pend);
+    sh.getRange(2, 1, 1, DEV_STATUS_HEAD.length).setValues([[
+      new Date(), kind, devSafe_(p.wifi, 64), devSafe_(p.place, 16), isFinite(rssi) ? rssi : '',
+      devSafe_(p.ip, 40), devSafe_(p.fw, 20), isFinite(pend) ? pend : ''
+    ]]);
+  } catch (err) {
+    // 状態の記録だけ失敗した場合は何もしない
+  }
+}
+/** シートに書く文字列：長さを切り、数式として解釈される先頭文字を無害化する */
+function devSafe_(v, max) {
+  let s = String(v == null ? '' : v).slice(0, max);
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return s;
 }
 
 /* ======================= 出勤・退勤 ======================= */
