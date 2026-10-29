@@ -1,0 +1,4 @@
+version=1.8.0
+file=firmware/tc-1.8.0.enc
+size=1237472
+sha256=cbcfbf35af585811dfca9ccd7b1b9bc2df7ee6855bf4844c04c54c8a023d5bd7

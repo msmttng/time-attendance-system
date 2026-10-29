@@ -2,6 +2,13 @@
 
 All notable changes to the Time Attendance System will be documented in this file.
 
+## [1.5.0] - 2026-10-29
+### Added
+- **出退勤スイッチ（ファームウェア v1.8.0 以降）向けの機能**（`gas/Device.gs`）: 押した時刻（ts）での記録、10秒以内にレバーを戻したときの取り消し（action=cancel）、応答に今日の出勤・退勤の時刻（today_a / today_b）を追加
+- **端末の見守り**: `devWatchdog`（10分ごと）。営業時間中に端末から30分以上連絡がないと管理者メールへ通知し、戻ったら再度通知
+- **時間で動く処理の登録**: `setupDeviceTriggers` で `devWatchdog` と既存の月次集計 `monthlyAggregationAndNotify`（毎月1日 8時）を登録
+- **自動アップデート用ファイル**: `firmware/manifest.txt` と暗号化したファームウェア `firmware/tc-<版>.enc`（端末が毎晩確認して取り込む）
+
 ## [1.4.0] - 2026-10-28
 ### Added
 - **出退勤スイッチの状態記録**: 端末（ファームウェア v1.6.5 以降）が送る Wi-Fi 名・場所（自宅/薬局）・電波・端末アドレス・ファームウェア・未送信件数を、`gas/Device.gs` が「端末状態」シートの2行目に最終通信時刻とともに上書き記録（行は増えない）。古い端末はこれまでどおり動作。
